@@ -3,6 +3,7 @@ import { kmeans } from "@/lib/color/kmeans";
 import { ditherLab } from "@/lib/color/dither";
 import { clearLightBackground, EMPTY, removeStrayStitches } from "@/lib/color/cleanup";
 import { isSkinLike, isSkinSafeThread } from "@/lib/color/skin";
+import { correctPortrait } from "@/lib/color/whitebalance";
 import { DMC, DMC_LAB } from "./dmc";
 import { gridHeight, resampleToLab } from "./grid";
 import { assignSymbols } from "./symbols";
@@ -15,6 +16,8 @@ export type PatternSettings = {
   skipWhiteBackground: boolean;
   /** Spend more colours on the middle of the photo and protect shadowed skin. */
   portrait: boolean;
+  /** Portrait mode only: cooler (negative) to warmer (positive) skin, 0 = as corrected */
+  skinWarmth: number;
   seed: number;
 };
 
@@ -25,6 +28,7 @@ export const DEFAULT_SETTINGS: PatternSettings = {
   cleanup: true,
   skipWhiteBackground: false,
   portrait: false,
+  skinWarmth: 0,
   seed: 1,
 };
 
@@ -49,6 +53,9 @@ export type Pattern = {
 // "Leave white background unstitched" treats very light, nearly neutral floss as background.
 const LIGHT_L = 90;
 const LIGHT_CHROMA = 8;
+// ...and pale edge stitches touching that background, where the photo blends into white.
+const FRINGE_L = 78;
+const FRINGE_CHROMA = 25;
 
 // Portrait mode: stitches near the centre count up to this many times more when choosing colours.
 const PORTRAIT_CENTRE_BOOST = 3;
@@ -101,8 +108,10 @@ export function buildPattern(rgba: Uint8ClampedArray, srcW: number, srcH: number
   const n = width * height;
   const portrait = s.portrait;
 
-  // 1–2. Area-average to the stitch grid, in Lab.
-  const lab = resampleToLab(rgba, srcW, srcH, width, height);
+  // 1–2. Area-average to the stitch grid, in Lab. Portrait mode corrects a
+  // colour cast on the skin first, so the colours are right before quantising.
+  const raw = resampleToLab(rgba, srcW, srcH, width, height);
+  const lab = portrait ? correctPortrait(raw, width, height, s.skinWarmth) : raw;
   const weights = portrait ? centreWeights(width, height) : undefined;
 
   // 3. k-means++ in Lab with CIEDE2000, down to N colours.
@@ -199,13 +208,20 @@ export function buildPattern(rgba: Uint8ClampedArray, srcW: number, srcH: number
   }
 
   if (s.skipWhiteBackground) {
-    out = clearLightBackground(out, width, height, (p) => {
-      const [L, a, b] = DMC[dmcIdx[p]].lab;
-      return L >= LIGHT_L && Math.hypot(a, b) <= LIGHT_CHROMA;
-    });
+    out = clearLightBackground(
+      out,
+      width,
+      height,
+      (p) => {
+        const [L, a, b] = DMC[dmcIdx[p]].lab;
+        return L >= LIGHT_L && Math.hypot(a, b) <= LIGHT_CHROMA;
+      },
+      // Edge stitches that are mostly background blended with the subject
+      (i) => lab[i * 3] >= FRINGE_L && Math.hypot(lab[i * 3 + 1], lab[i * 3 + 2]) <= FRINGE_CHROMA,
+    );
   }
 
-  return { ...compactPalette(out, dmcIdx, width, height), faceLikely: centreSkinShare(lab, width, height) >= FACE_SKIN_SHARE };
+  return { ...compactPalette(out, dmcIdx, width, height), faceLikely: centreSkinShare(raw, width, height) >= FACE_SKIN_SHARE };
 }
 
 function centreSkinShare(lab: Float32Array, width: number, height: number): number {

@@ -7,13 +7,20 @@ import type { Pattern } from "@/lib/pattern/pipeline";
 import { downloadBlob, patternFilename } from "@/lib/pattern/download";
 import type { Paper } from "@/lib/pdf/buildPdf";
 
-function defaultPaper(): Paper {
+export function defaultPaper(): Paper {
   const lang = typeof navigator === "undefined" ? "" : navigator.language;
   return /^(en-US|en-CA|es-MX|fr-CA)$/i.test(lang) ? "letter" : "a4";
 }
 
-export function ExportPanel({ pattern, fabric }: { pattern: Pattern; fabric: FabricCount }) {
-  const [paper, setPaper] = useState<Paper>(defaultPaper);
+type Props = {
+  pattern: Pattern;
+  fabric: FabricCount;
+  /** Kept by the parent so the choice survives starting a new photo */
+  paper: Paper;
+  onPaperChange: (p: Paper) => void;
+};
+
+export function ExportPanel({ pattern, fabric, paper, onPaperChange: setPaper }: Props) {
   const [busy, setBusy] = useState<"pdf" | "png" | null>(null);
   const [error, setError] = useState<string | null>(null);
 

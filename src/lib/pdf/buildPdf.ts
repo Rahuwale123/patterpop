@@ -294,7 +294,14 @@ function drawKey(doc: JsPDF, p: Pattern, opts: PdfOptions, pageW: number, pageH:
   y += 10;
 
   const colX = { sym: MARGIN, sw: MARGIN + 14, code: MARGIN + 30, name: MARGIN + 50, st: pageW - MARGIN - 22, sk: pageW - MARGIN };
-  const header = () => {
+  const header = (continued = false) => {
+    if (continued) {
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(16);
+      doc.setTextColor(30);
+      doc.text("Colour key and shopping list (continued)", MARGIN, y);
+      y += 10;
+    }
     doc.setFont("helvetica", "bold");
     doc.setFontSize(9);
     doc.setTextColor(30);
@@ -318,7 +325,7 @@ function drawKey(doc: JsPDF, p: Pattern, opts: PdfOptions, pageW: number, pageH:
     if (y > pageH - MARGIN - 18) {
       doc.addPage();
       y = MARGIN + 6;
-      header();
+      header(true);
     }
     const skeins = skeinsNeeded(c.count, opts.fabric);
     totalSkeins += skeins;

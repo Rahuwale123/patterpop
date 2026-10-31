@@ -7,7 +7,8 @@ import { Settings } from "./Settings";
 import { Preview } from "./Preview";
 import { ColorKey } from "./ColorKey";
 import { SizePanel } from "./SizePanel";
-import { ExportPanel } from "./ExportPanel";
+import { defaultPaper, ExportPanel } from "./ExportPanel";
+import type { Paper } from "@/lib/pdf/buildPdf";
 import { DEFAULT_SETTINGS, type Pattern, type PatternSettings } from "@/lib/pattern/pipeline";
 import { cropSource, loadFile, loadSource, runPattern, type CropRect, type SourceImage } from "@/lib/pattern/runner";
 import { FABRIC_COUNTS, type FabricCount } from "@/lib/pattern/fabric";
@@ -35,6 +36,7 @@ export default function PatternTool() {
   const [cropped, setCropped] = useState<SourceImage | null>(null);
   const [settings, setSettings] = useState<PatternSettings>(DEFAULT_SETTINGS);
   const [fabric, setFabric] = useState<FabricCount>(14);
+  const [paper, setPaper] = useState<Paper>(defaultPaper);
   const [edits, setEdits] = useState<ColourEdit[]>([]);
   const [base, setBase] = useState<Pattern | null>(null);
   const [saved, setSaved] = useState<SavedProject | null>(null);
@@ -226,6 +228,14 @@ export default function PatternTool() {
               >
                 Use 100 stitches
               </button>
+              {!settings.portrait && (
+                <button
+                  onClick={() => setSettings({ ...settings, portrait: true })}
+                  className="font-semibold text-madder underline underline-offset-2"
+                >
+                  Turn on Portrait mode
+                </button>
+              )}
             </p>
           )}
           {pattern ? (
@@ -244,7 +254,7 @@ export default function PatternTool() {
           )}
           {pattern && (
             <Panel title="Download">
-              <ExportPanel pattern={pattern} fabric={fabric} />
+              <ExportPanel pattern={pattern} fabric={fabric} paper={paper} onPaperChange={setPaper} />
             </Panel>
           )}
         </div>

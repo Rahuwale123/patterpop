@@ -45,13 +45,16 @@ export function removeStrayStitches(cells: Int16Array, width: number, height: nu
 
 /**
  * Mark near-white cells connected to the edge of the design as unstitched, so a
- * white background is left as bare fabric. `isLight[p]` says whether palette entry p counts.
+ * white background is left as bare fabric. `isLight(p)` says whether palette entry p counts.
+ * `isFringe(i)`, if given, also clears cell i when it touches the cleared background
+ * (one stitch deep), for pale stitches where the subject blends into the white.
  */
 export function clearLightBackground(
   cells: Int16Array,
   width: number,
   height: number,
   isLight: (paletteIndex: number) => boolean,
+  isFringe?: (cellIndex: number) => boolean,
 ): Int16Array {
   const out = Int16Array.from(cells);
   const stack: number[] = [];
@@ -77,6 +80,20 @@ export function clearLightBackground(
     if (x < width - 1) push(i + 1);
     if (y > 0) push(i - width);
     if (y < height - 1) push(i + width);
+  }
+  if (isFringe) {
+    const fringe: number[] = [];
+    for (let i = 0; i < out.length; i++) {
+      if (out[i] === EMPTY || !isFringe(i)) continue;
+      const x = i % width;
+      const touches =
+        (x > 0 && out[i - 1] === EMPTY) ||
+        (x < width - 1 && out[i + 1] === EMPTY) ||
+        (i >= width && out[i - width] === EMPTY) ||
+        (i + width < out.length && out[i + width] === EMPTY);
+      if (touches) fringe.push(i);
+    }
+    for (const i of fringe) out[i] = EMPTY;
   }
   return out;
 }
