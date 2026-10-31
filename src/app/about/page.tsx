@@ -6,6 +6,7 @@ import { site } from "@/lib/seo/site";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { PageIntro } from "@/components/layout/PageIntro";
 import { Prose } from "@/components/content/Prose";
+import { Container } from "@/components/layout/Container";
 import { StitchDivider } from "@/components/content/StitchDivider";
 import { CopyButton } from "@/components/content/CopyButton";
 import dmcData from "@/data/dmc.json";
@@ -13,7 +14,7 @@ import dmcData from "@/data/dmc.json";
 export const metadata: Metadata = buildMetadata({
   title: "About PatternPop – Who Made It and How It Works",
   description:
-    "Why PatternPop exists, how it matches your photo to real DMC floss colours, where the thread colour data comes from, and how to link to us from your blog.",
+    "Why PatternPop exists, how it turns your photo into real DMC thread colours you can buy, a tip for checking shades, and how to link to us from your blog.",
   path: "/about",
 });
 
@@ -84,19 +85,15 @@ export default function AboutPage() {
         <StitchDivider />
 
         <Prose>
-          <h2>Where the DMC colours come from</h2>
+          <h2>Real DMC colours</h2>
           <p>
-            DMC has never published official screen colours for its threads, so every pattern tool uses an
-            approximation. PatternPop uses the community-made list from the{" "}
-            <a href="https://github.com/sharlagelfand/dmc" rel="noopener">dmc project by Sharla Gelfand</a> (MIT
-            licence), which is based on the colour list from{" "}
-            <a href="https://github.com/adrianj/CrossStitchCreator" rel="noopener">CrossStitchCreator by adrianj</a>.
-            Thank you to both.
+            Every colour in your pattern is a DMC thread number, the brand you&apos;ll find in almost any craft shop.
+            There are {dmcData.colors.length} shades to match against, so even soft skin tones and fur have a close
+            thread.
           </p>
           <p>
-            Colours on screen are approximate. Screens differ, and thread has a sheen that no screen can show. If a
-            colour matters, hold the real skein up to your photo in daylight before you start. DMC is a trademark of
-            DMC. PatternPop isn&apos;t connected with DMC.
+            <strong>A tip from experience:</strong> screens show colour a little differently from real thread. If one
+            shade really matters, hold the skein next to your photo in daylight before you start.
           </p>
         </Prose>
 
@@ -108,7 +105,7 @@ export default function AboutPage() {
             If PatternPop helped you and you write about stitching, a link means a lot. It&apos;s how other stitchers
             find the tool. Copy this into your blog post or resources page:
           </p>
-          <pre className="overflow-x-auto rounded-lg border-2 border-dashed border-hoop-dark/50 bg-linen p-3 text-sm">
+          <pre className="whitespace-pre-wrap break-all rounded-lg border-2 border-dashed border-hoop-dark/50 bg-linen p-3 text-sm">
             <code>{linkSnippet}</code>
           </pre>
           <CopyButton text={linkSnippet} label="Copy the link code" />
@@ -116,6 +113,20 @@ export default function AboutPage() {
             Questions or ideas? <Link href="/contact">Get in touch</Link>.
           </p>
         </Prose>
+        <Container className="mt-12">
+          <p className="border-t border-dashed border-hoop-dark/40 pt-4 text-sm text-muted">
+            Credits: DMC colour data from the{" "}
+            <a href="https://github.com/sharlagelfand/dmc" rel="noopener" className="underline">
+              dmc project
+            </a>{" "}
+            by Sharla Gelfand (MIT licence), based on{" "}
+            <a href="https://github.com/adrianj/CrossStitchCreator" rel="noopener" className="underline">
+              CrossStitchCreator
+            </a>{" "}
+            by adrianj. DMC is a trademark of DMC. PatternPop is an independent tool and isn&apos;t affiliated with
+            DMC.
+          </p>
+        </Container>
       </div>
     </>
   );

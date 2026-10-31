@@ -1,36 +1,75 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# PatternPop
 
-## Getting Started
+A free, browser-only cross stitch pattern maker: [patternpop.online](https://patternpop.online).
+Photos are processed entirely on the visitor's device. There is no server, database or account system.
 
-First, run the development server:
+## Run locally
+
+Requires Node.js 20.9 or newer (developed on Node 26 via nvm).
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev          # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Dev-only pages:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- `/dev/compare` runs the colour pipeline on the three sample photos side by side, with live settings.
+  It uses the `.dev.tsx` page extension, which only `next dev` routes, so it never reaches the build.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Test, lint, build
 
-## Learn More
+```bash
+npm test             # Vitest: Lab, CIEDE2000 (all 34 Sharma pairs), k-means, skeins, fabric, colour edits, pipeline
+npm run lint
+npm run build        # static export to ./out
+npm run audit:seo    # after a build: title, description, canonical, OG image, one H1, JSON-LD on every page
+```
 
-To learn more about Next.js, take a look at the following resources:
+Preview the production build: `npx serve out`.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Deploy to Cloudflare Pages
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+1. Push this repo to GitHub (or GitLab).
+2. Cloudflare dashboard → **Workers & Pages** → **Create** → **Pages** → **Connect to Git** → pick the repo.
+3. Build settings:
+   - Framework preset: **None** (or Next.js (Static HTML Export))
+   - Build command: `npm run build`
+   - Build output directory: `out`
+   - Environment variable: `NODE_VERSION` = `22` (or newer)
+4. Optional environment variables:
+   - `NEXT_PUBLIC_CF_BEACON`: your Cloudflare Web Analytics token. Nothing is loaded if unset.
+   - `NEXT_PUBLIC_ADS_ENABLED`: `true` turns on the reserved `AdSlot` spaces. Off by default.
+5. Save and deploy. Every push to the main branch redeploys.
 
-## Deploy on Vercel
+### Connect patternpop.online
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+1. In the Pages project → **Custom domains** → **Set up a custom domain** → enter `patternpop.online`.
+2. If the domain's DNS is already on Cloudflare, it adds the record for you. Otherwise either move the
+   domain's nameservers to Cloudflare (recommended), or add the `CNAME` record Cloudflare shows you at your
+   registrar.
+3. Add `www.patternpop.online` too, then add a **Redirect Rule** (Rules → Redirect Rules) sending
+   `www.patternpop.online/*` to `https://patternpop.online/${1}` with a 301, so there is one canonical host.
+4. SSL is issued automatically. Under SSL/TLS, set mode to **Full** and turn on **Always Use HTTPS**.
+5. Add the site to Google Search Console and submit `https://patternpop.online/sitemap.xml`.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Before launch
+
+- Replace the bracketed placeholders on `/about` with your own story. All long copy is marked
+  `{/* DRAFT: human review */}`.
+- Set up the inbox for `hello@patternpop.online` (in `src/lib/seo/site.ts`), e.g. with Cloudflare Email Routing.
+- Swap `/public/samples/*.jpg` for your own photos, then regenerate the before/after WebPs
+  (run the pipeline in `/dev/compare` and export the realistic previews at 480 px).
+
+## Where things live
+
+- `src/lib/color`: Lab conversion, CIEDE2000, seeded k-means++, dithering, stray-stitch cleanup
+- `src/lib/pattern`: grid resampling, pipeline, symbols, DMC data, skeins, fabric maths, colour edits, rendering
+- `src/workers/pattern.worker.ts`: runs the pipeline off the main thread
+- `src/lib/pdf/buildPdf.ts`: PDF export (jsPDF, loaded only when someone downloads)
+- `src/lib/storage/project.ts`: last project auto-saved in IndexedDB
+- `src/data/tools.ts`: the list of tools. Set `live: true` only once a page exists. It drives the sitemap,
+  footer and related-tools block.
+- `src/data/dmc.json`: DMC colours with source and licence recorded at the top
+
+Look for `TODO(pro)` for the places a future Pro licence check would go.

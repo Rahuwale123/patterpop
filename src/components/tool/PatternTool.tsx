@@ -213,7 +213,8 @@ export default function PatternTool() {
             </Panel>
           )}
         </div>
-        <div className="min-w-0 space-y-5">
+        {/* On phones the preview comes first, so the pattern is visible right after cropping. */}
+        <div className="order-first min-w-0 space-y-5 md:order-none">
           {pattern ? (
             <div className={status === "working" ? "opacity-70 transition-opacity" : undefined}>
               <Preview pattern={pattern} label="Your pattern" height={460} />

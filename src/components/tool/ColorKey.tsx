@@ -126,7 +126,7 @@ export function ColorKey({ palette, fabric, onMerge, onSwap, edited, onReset }: 
 
   return (
     <div>
-      <div className="overflow-x-auto">
+      <div className="relative overflow-x-auto">
         <table className="w-full min-w-[520px] border-collapse text-left text-sm">
           <caption className="sr-only">Colour key and shopping list</caption>
           <thead>

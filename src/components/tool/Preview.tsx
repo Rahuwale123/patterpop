@@ -100,7 +100,7 @@ export function Preview({ pattern, initialView = "realistic", initialZoom = 2, h
         tabIndex={0}
         role="region"
         aria-label={`${label} preview, scroll to pan`}
-        className="cursor-grab overflow-auto active:cursor-grabbing"
+        className="relative cursor-grab overflow-auto active:cursor-grabbing"
         style={{ height }}
         onPointerDown={onDown}
         onPointerMove={onMove}

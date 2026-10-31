@@ -194,7 +194,7 @@ export default function HomePage() {
           18-count. For a first custom cross stitch pattern, 14-count is the kindest choice. The holes are easy
           to see and you can work with two strands.
         </p>
-        <div className="overflow-x-auto">
+        <div className="relative overflow-x-auto">
           <table className="w-full min-w-[420px] border-collapse text-left text-[15px]">
             <caption className="mb-2 text-left text-sm text-muted">
               Finished width for a design of a given width in stitches
