@@ -1,0 +1,82 @@
+@import "tailwindcss";
+
+@theme {
+  --color-aida: #f7f3ea;
+  --color-aida-deep: #ece5d5;
+  --color-linen: #fffdf8;
+  --color-madder: #9b2c23;
+  --color-madder-dark: #7a211a;
+  --color-indigo: #2c3e6b;
+  --color-mustard: #c4922a;
+  --color-sage: #6f8763;
+  --color-charcoal: #2b2926;
+  --color-muted: #5c574f;
+  --color-hoop: #c39a6b;
+  --color-hoop-dark: #9c7547;
+
+  --font-serif: var(--font-fraunces), Georgia, serif;
+  --font-sans: var(--font-figtree), system-ui, sans-serif;
+}
+
+html {
+  background: var(--color-aida);
+}
+
+body {
+  background: var(--color-aida);
+  color: var(--color-charcoal);
+  font-family: var(--font-sans);
+}
+
+:focus-visible {
+  outline: 3px solid var(--color-indigo);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* Woven Aida texture, hero only. Two faint thread grids, no image. */
+.aida-weave {
+  background-color: var(--color-aida);
+  background-image:
+    repeating-linear-gradient(0deg, rgb(43 41 38 / 0.035) 0 1px, transparent 1px 6px),
+    repeating-linear-gradient(90deg, rgb(43 41 38 / 0.035) 0 1px, transparent 1px 6px);
+}
+
+/* Fabric inside the hoop: a denser weave so it reads as cloth. */
+.hoop-fabric {
+  background-color: var(--color-linen);
+  background-image:
+    repeating-linear-gradient(0deg, rgb(43 41 38 / 0.06) 0 1px, transparent 1px 5px),
+    repeating-linear-gradient(90deg, rgb(43 41 38 / 0.06) 0 1px, transparent 1px 5px);
+}
+
+/* Cross-stitch X bullets */
+.x-list {
+  list-style: none;
+  padding-left: 0;
+}
+.x-list > li {
+  position: relative;
+  padding-left: 1.6rem;
+}
+.x-list > li::before {
+  content: "";
+  position: absolute;
+  left: 0.15rem;
+  top: 0.5em;
+  width: 0.7rem;
+  height: 0.7rem;
+  background:
+    linear-gradient(45deg, transparent 42%, var(--color-madder) 42% 58%, transparent 58%),
+    linear-gradient(-45deg, transparent 42%, var(--color-madder) 42% 58%, transparent 58%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
