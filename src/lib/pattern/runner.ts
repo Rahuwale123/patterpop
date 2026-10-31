@@ -58,3 +58,36 @@ export function runPattern(src: SourceImage, settings: PatternSettings): Promise
     getWorker().postMessage(req, [pixels]);
   });
 }
+
+/** Crop rectangle in 0..1 units of the source image. */
+export type CropRect = { x: number; y: number; w: number; h: number };
+
+export function cropSource(src: SourceImage, r: CropRect): SourceImage {
+  const x0 = Math.max(0, Math.round(r.x * src.width));
+  const y0 = Math.max(0, Math.round(r.y * src.height));
+  const w = Math.max(1, Math.min(src.width - x0, Math.round(r.w * src.width)));
+  const h = Math.max(1, Math.min(src.height - y0, Math.round(r.h * src.height)));
+  const out = new Uint8ClampedArray(w * h * 4);
+  for (let y = 0; y < h; y++) {
+    const from = ((y0 + y) * src.width + x0) * 4;
+    out.set(src.pixels.subarray(from, from + w * 4), y * w * 4);
+  }
+  return { pixels: out, width: w, height: h };
+}
+
+function isHeic(file: File): boolean {
+  return /image\/hei[cf]/i.test(file.type) || /\.hei[cf]$/i.test(file.name);
+}
+
+/** Decode an uploaded file. HEIC (iPhone photos) pulls in heic2any only when needed. */
+export async function loadFile(file: File): Promise<SourceImage> {
+  if (!isHeic(file)) return loadSource(file);
+  try {
+    // Some browsers (Safari) can decode HEIC natively.
+    return await loadSource(file);
+  } catch {
+    const { default: heic2any } = await import("heic2any");
+    const converted = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.92 });
+    return loadSource(Array.isArray(converted) ? converted[0] : converted);
+  }
+}

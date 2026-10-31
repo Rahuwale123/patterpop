@@ -1,4 +1,7 @@
+"use client";
+
 import clsx from "clsx";
+import { useState } from "react";
 
 type Props = {
   onFile?: (file: File) => void;
@@ -9,12 +12,29 @@ type Props = {
 // Fabric stretched in an embroidery hoop. Rendered statically in the HTML as the
 // tool placeholder, then reused by PatternTool once JS loads.
 export function Uploader({ onFile, disabled, className }: Props) {
+  const [over, setOver] = useState(false);
+  const dropProps = onFile
+    ? {
+        onDragOver: (e: React.DragEvent) => {
+          e.preventDefault();
+          setOver(true);
+        },
+        onDragLeave: () => setOver(false),
+        onDrop: (e: React.DragEvent) => {
+          e.preventDefault();
+          setOver(false);
+          const f = e.dataTransfer.files[0];
+          if (f) onFile(f);
+        },
+      }
+    : {};
   return (
-    <div className={clsx("mx-auto aspect-square w-full max-w-[340px]", className)}>
+    <div className={clsx("mx-auto aspect-square w-full max-w-[340px]", className)} {...dropProps}>
       <label
         className={clsx(
           "group relative flex h-full w-full items-center justify-center rounded-full",
           "border-[14px] border-hoop shadow-[inset_0_0_0_3px_var(--color-hoop-dark),0_0_0_3px_var(--color-hoop-dark)]",
+          over && "ring-4 ring-madder/40",
           "hoop-fabric focus-within:outline focus-within:outline-3 focus-within:outline-offset-4 focus-within:outline-indigo",
           disabled ? "cursor-wait" : "cursor-pointer",
         )}

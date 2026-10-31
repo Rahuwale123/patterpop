@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { buildMetadata } from "@/lib/seo/metadata";
 import { Container } from "@/components/layout/Container";
-import { Uploader } from "@/components/tool/Uploader";
+import { ToolLoader } from "@/components/tool/ToolLoader";
 import { StitchDivider } from "@/components/content/StitchDivider";
 import { Prose } from "@/components/content/Prose";
 import { HowItWorks } from "@/components/content/HowItWorks";
@@ -63,9 +63,8 @@ export default function HomePage() {
               happens in your browser.
             </p>
           </div>
-          {/* Static placeholder. PatternTool (ssr:false) mounts over this in Phase 2. */}
           <div id="tool" className="mt-8 min-h-[360px]">
-            <Uploader />
+            <ToolLoader />
           </div>
         </Container>
       </section>

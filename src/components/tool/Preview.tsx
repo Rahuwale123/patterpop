@@ -107,7 +107,7 @@ export function Preview({ pattern, initialView = "realistic", initialZoom = 2, h
         onPointerUp={onUp}
         onPointerCancel={onUp}
       >
-        <canvas ref={canvasRef} role="img" aria-label={`${label} as a cross stitch ${view} view`} className="block" />
+        <canvas ref={canvasRef} role="img" aria-label={`${label} as a cross stitch ${view} view`} className="m-auto block" />
       </div>
     </div>
   );
