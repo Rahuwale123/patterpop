@@ -44,10 +44,14 @@ export function Uploader({ onFile, disabled, className }: Props) {
           className="sr-only"
           disabled={disabled}
           aria-label="Choose a photo to turn into a cross stitch pattern"
-          onChange={(e) => {
-            const f = e.currentTarget.files?.[0];
-            if (f && onFile) onFile(f);
-          }}
+          onChange={
+            onFile
+              ? (e) => {
+                  const f = e.currentTarget.files?.[0];
+                  if (f) onFile(f);
+                }
+              : undefined
+          }
         />
       </label>
     </div>
