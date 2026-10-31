@@ -215,6 +215,19 @@ export default function PatternTool() {
         </div>
         {/* On phones the preview comes first, so the pattern is visible right after cropping. */}
         <div className="order-first min-w-0 space-y-5 md:order-none">
+          {pattern && settings.width < 100 && (settings.portrait || pattern.faceLikely) && (
+            <p className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border-2 border-dashed border-mustard bg-linen px-3 py-2 text-sm">
+              <span>
+                <strong>Tip:</strong> Faces look better at 100+ stitches.
+              </span>
+              <button
+                onClick={() => setSettings({ ...settings, width: 100 })}
+                className="font-semibold text-madder underline underline-offset-2"
+              >
+                Use 100 stitches
+              </button>
+            </p>
+          )}
           {pattern ? (
             <div className={status === "working" ? "opacity-70 transition-opacity" : undefined}>
               <Preview pattern={pattern} label="Your pattern" height={460} />

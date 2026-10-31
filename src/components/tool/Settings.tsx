@@ -84,6 +84,12 @@ export function Settings({ value, onChange, children }: Props) {
       />
       {children}
       <div className="space-y-2">
+        <Toggle
+          id="set-portrait"
+          label="Portrait mode (more detail and natural skin on faces)"
+          checked={value.portrait}
+          onChange={(v) => set("portrait", v)}
+        />
         <Toggle id="set-cleanup" label="Clean up stray stitches" checked={value.cleanup} onChange={(v) => set("cleanup", v)} />
         <Toggle id="set-dither" label="Dithering" checked={value.dither} onChange={(v) => set("dither", v)} />
         <Toggle

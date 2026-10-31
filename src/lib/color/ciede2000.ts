@@ -71,16 +71,26 @@ export function deltaE2000Lab(x: Lab, y: Lab): number {
   return deltaE2000(x[0], x[1], x[2], y[0], y[1], y[2]);
 }
 
-/** Index of the palette colour (flat L,a,b triples) nearest to the given Lab. */
-export function nearestIndex(L: number, a: number, b: number, palette: Float32Array | Float64Array): number {
-  let best = 0;
+/**
+ * Index of the palette colour (flat L,a,b triples) nearest to the given Lab.
+ * `allowed` optionally limits the search; if it rules out everything, all colours are considered.
+ */
+export function nearestIndex(
+  L: number,
+  a: number,
+  b: number,
+  palette: Float32Array | Float64Array,
+  allowed?: Uint8Array,
+): number {
+  let best = -1;
   let bestD = Infinity;
   for (let i = 0, n = palette.length / 3; i < n; i++) {
+    if (allowed && !allowed[i]) continue;
     const d = deltaE2000(L, a, b, palette[i * 3], palette[i * 3 + 1], palette[i * 3 + 2]);
     if (d < bestD) {
       bestD = d;
       best = i;
     }
   }
-  return best;
+  return best < 0 && allowed ? nearestIndex(L, a, b, palette) : best;
 }

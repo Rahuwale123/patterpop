@@ -4,7 +4,13 @@ import { nearestIndex } from "./ciede2000";
  * Serpentine Floyd–Steinberg dithering in Lab against a fixed palette.
  * `lab` is the stitch grid as flat L,a,b triples; returns a palette index per cell.
  */
-export function ditherLab(lab: Float32Array, width: number, height: number, palette: Float64Array): Int16Array {
+export function ditherLab(
+  lab: Float32Array,
+  width: number,
+  height: number,
+  palette: Float64Array,
+  allowedFor?: (L: number, a: number, b: number) => Uint8Array | undefined,
+): Int16Array {
   const buf = Float32Array.from(lab);
   const out = new Int16Array(width * height);
   const spread = (x: number, y: number, eL: number, ea: number, eb: number, w: number) => {
@@ -23,7 +29,7 @@ export function ditherLab(lab: Float32Array, width: number, height: number, pale
       const L = buf[i * 3];
       const a = buf[i * 3 + 1];
       const b = buf[i * 3 + 2];
-      const p = nearestIndex(L, a, b, palette);
+      const p = nearestIndex(L, a, b, palette, allowedFor?.(L, a, b));
       out[i] = p;
       const eL = L - palette[p * 3];
       const ea = a - palette[p * 3 + 1];
