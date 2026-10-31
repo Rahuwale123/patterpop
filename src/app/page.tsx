@@ -18,10 +18,30 @@ export const metadata: Metadata = buildMetadata({
   path: "/",
 });
 
+// Real pipeline output (default settings) from the photos in /public/samples.
+// Swap in your own photos and regenerate before launch.
 const samples = [
-  { slug: "pet", label: "A dog on the sofa", stitches: "80 × 80 stitches, 18 colours" },
-  { slug: "portrait", label: "A portrait by a window", stitches: "90 × 112 stitches, 24 colours" },
-  { slug: "flower", label: "A garden rose", stitches: "70 × 70 stitches, 14 colours" },
+  {
+    slug: "pet",
+    label: "A pug in a blanket",
+    alt: "A pug wrapped in a striped blanket",
+    patternAlt: "The pug photo turned into a pattern by the cross stitch pattern maker",
+    stitches: "80 × 80 stitches, 20 colours",
+  },
+  {
+    slug: "portrait",
+    label: "A summer portrait",
+    alt: "A woman in sunglasses holding daisies in a field",
+    patternAlt: "The portrait as a stitched cross stitch pattern",
+    stitches: "80 × 80 stitches, 19 colours",
+  },
+  {
+    slug: "flower",
+    label: "A purple petunia",
+    alt: "A purple petunia flower against dark leaves",
+    patternAlt: "The petunia as a stitched cross stitch pattern",
+    stitches: "80 × 80 stitches, 14 colours",
+  },
 ];
 
 const steps = [
@@ -79,22 +99,32 @@ export default function HomePage() {
             {samples.map((s) => (
               <li key={s.slug} className="rounded-xl border-2 border-dashed border-hoop-dark/50 bg-linen p-3">
                 <div className="grid grid-cols-2 gap-2">
-                  <img
-                    src={`/samples/${s.slug}-photo.svg`}
-                    alt={`${s.label}, the original photo`}
-                    width={300}
-                    height={300}
-                    loading="lazy"
-                    className="aspect-square w-full rounded-md object-cover"
-                  />
-                  <img
-                    src={`/samples/${s.slug}-pattern.svg`}
-                    alt={`${s.label} turned into a cross stitch pattern`}
-                    width={300}
-                    height={300}
-                    loading="lazy"
-                    className="aspect-square w-full rounded-md object-cover"
-                  />
+                  <div className="relative">
+                    <img
+                      src={`/samples/${s.slug}-photo.webp`}
+                      alt={s.alt}
+                      width={480}
+                      height={480}
+                      loading="lazy"
+                      className="aspect-square w-full rounded-md object-cover"
+                    />
+                    <span className="absolute left-1.5 top-1.5 rounded bg-charcoal/75 px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-linen">
+                      Photo
+                    </span>
+                  </div>
+                  <div className="relative">
+                    <img
+                      src={`/samples/${s.slug}-pattern.webp`}
+                      alt={s.patternAlt}
+                      width={480}
+                      height={480}
+                      loading="lazy"
+                      className="aspect-square w-full rounded-md object-cover"
+                    />
+                    <span className="absolute left-1.5 top-1.5 rounded bg-charcoal/75 px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-linen">
+                      Pattern
+                    </span>
+                  </div>
                 </div>
                 <p className="mt-2 text-sm font-semibold">{s.label}</p>
                 <p className="text-sm text-muted">{s.stitches}</p>
