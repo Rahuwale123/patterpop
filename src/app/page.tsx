@@ -8,13 +8,18 @@ import { HowItWorks } from "@/components/content/HowItWorks";
 import { Faq } from "@/components/content/Faq";
 import { RelatedTools } from "@/components/content/RelatedTools";
 import { AdSlot } from "@/components/ads/AdSlot";
+import { JsonLd } from "@/components/seo/JsonLd";
+import { breadcrumbList, faqPage, webApplication } from "@/lib/seo/schema";
 import { homeFaqs } from "@/data/faqs/home";
 import { FABRIC_COUNTS, finishedSizeInches, inchesToCm } from "@/lib/pattern/fabric";
 
+const description =
+  "Turn any photo into a printable cross stitch pattern with DMC floss colours, a symbol chart and a shopping list. Free, no sign-up, works in your browser.";
+
 export const metadata: Metadata = buildMetadata({
-  title: "Free Cross Stitch Pattern Maker – Photo to Pattern | PatternPop",
-  description:
-    "Turn any photo into a printable cross stitch pattern with DMC floss colours, a symbol chart and a shopping list. Free, no sign-up, works in your browser.",
+  // Brand dropped to stay within 60 characters; Google shows the site name separately.
+  title: "Free Cross Stitch Pattern Maker – Photo to Pattern",
+  description,
   path: "/",
 });
 
@@ -72,6 +77,9 @@ function fmt(n: number) {
 export default function HomePage() {
   return (
     <>
+      <JsonLd data={webApplication("PatternPop Cross Stitch Pattern Maker", "/", description)} />
+      <JsonLd data={faqPage(homeFaqs)} />
+      <JsonLd data={breadcrumbList([{ name: "Home", path: "/" }])} />
       <section className="aida-weave border-b border-dashed border-hoop-dark/30 pb-12 pt-10 sm:pt-14">
         <Container width="tool">
           <div className="mx-auto max-w-[720px] text-center">
