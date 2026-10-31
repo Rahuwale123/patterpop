@@ -1,30 +1,62 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Uploader } from "./Uploader";
 import { Cropper } from "./Cropper";
 import { Settings } from "./Settings";
 import { Preview } from "./Preview";
 import { ColorKey } from "./ColorKey";
+import { SizePanel } from "./SizePanel";
+import { ExportPanel } from "./ExportPanel";
 import { DEFAULT_SETTINGS, type Pattern, type PatternSettings } from "@/lib/pattern/pipeline";
-import { cropSource, loadFile, runPattern, type CropRect, type SourceImage } from "@/lib/pattern/runner";
-import { FABRIC_COUNTS, finishedSizeInches, inchesToCm, type FabricCount } from "@/lib/pattern/fabric";
+import { cropSource, loadFile, loadSource, runPattern, type CropRect, type SourceImage } from "@/lib/pattern/runner";
+import { FABRIC_COUNTS, type FabricCount } from "@/lib/pattern/fabric";
+import { applyEdits, type ColourEdit } from "@/lib/pattern/edit";
+import { clearProject, encodeSource, loadProject, saveProject, type SavedProject } from "@/lib/storage/project";
 
 type Step = "upload" | "crop" | "pattern";
 
 const ACCEPTED = /^image\/(jpeg|png|webp|heic|heif)$/i;
 
+function Panel({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="rounded-xl border-2 border-dashed border-hoop-dark/50 bg-linen p-4">
+      <h2 className="mb-3 font-serif text-lg font-bold">{title}</h2>
+      {children}
+    </section>
+  );
+}
+
 export default function PatternTool() {
   const [step, setStep] = useState<Step>("upload");
   const [source, setSource] = useState<SourceImage | null>(null);
+  const [sourceBlob, setSourceBlob] = useState<Blob | null>(null);
   const [crop, setCrop] = useState<CropRect | undefined>();
   const [cropped, setCropped] = useState<SourceImage | null>(null);
   const [settings, setSettings] = useState<PatternSettings>(DEFAULT_SETTINGS);
   const [fabric, setFabric] = useState<FabricCount>(14);
-  const [pattern, setPattern] = useState<Pattern | null>(null);
+  const [edits, setEdits] = useState<ColourEdit[]>([]);
+  const [base, setBase] = useState<Pattern | null>(null);
+  const [saved, setSaved] = useState<SavedProject | null>(null);
   const [status, setStatus] = useState<"idle" | "loading" | "working">("idle");
   const [error, setError] = useState<string | null>(null);
   const runId = useRef(0);
+
+  const pattern = useMemo(() => (base ? applyEdits(base, edits) : null), [base, edits]);
+
+  useEffect(() => {
+    loadProject().then(setSaved);
+  }, []);
+
+  const openSource = (src: SourceImage, blob: Blob | null) => {
+    setSource(src);
+    setSourceBlob(blob);
+    setCrop(undefined);
+    setBase(null);
+    setEdits([]);
+    setStep("crop");
+    if (!blob) encodeSource(src).then(setSourceBlob).catch(() => setSourceBlob(null));
+  };
 
   const onFile = async (file: File) => {
     setError(null);
@@ -34,11 +66,7 @@ export default function PatternTool() {
     }
     setStatus("loading");
     try {
-      const src = await loadFile(file);
-      setSource(src);
-      setCrop(undefined);
-      setPattern(null);
-      setStep("crop");
+      openSource(await loadFile(file), null);
     } catch {
       setError("Sorry, that photo couldn't be opened. Try saving it as a JPG first.");
     } finally {
@@ -46,8 +74,30 @@ export default function PatternTool() {
     }
   };
 
-  // Re-run the pipeline when the crop or settings change. Slider drags are debounced,
-  // and results from older runs are ignored.
+  const restore = async (p: SavedProject) => {
+    setStatus("loading");
+    try {
+      const src = await loadSource(p.source);
+      setSource(src);
+      setSourceBlob(p.source);
+      setCrop(p.crop);
+      setCropped(cropSource(src, p.crop));
+      setSettings({ ...DEFAULT_SETTINGS, ...p.settings });
+      setFabric(p.fabric);
+      setEdits(p.edits);
+      setBase(null);
+      setStep("pattern");
+    } catch {
+      setError("Your last pattern couldn't be opened. Please start a new one.");
+      clearProject();
+      setSaved(null);
+    } finally {
+      setStatus("idle");
+    }
+  };
+
+  // Re-run the pipeline when the crop or settings change. Slider drags are
+  // debounced, and results from older runs are ignored.
   useEffect(() => {
     if (!cropped) return;
     const id = ++runId.current;
@@ -55,13 +105,24 @@ export default function PatternTool() {
       setStatus("working");
       runPattern(cropped, settings)
         .then(({ pattern: p }) => {
-          if (id === runId.current) setPattern(p);
+          if (id === runId.current) setBase(p);
         })
         .catch(() => id === runId.current && setError("Something went wrong making the pattern. Please try again."))
         .finally(() => id === runId.current && setStatus("idle"));
     }, 200);
     return () => clearTimeout(t);
   }, [cropped, settings]);
+
+  // Auto-save the current project on this device.
+  useEffect(() => {
+    if (step !== "pattern" || !sourceBlob || !crop) return;
+    const t = setTimeout(() => {
+      const p: SavedProject = { version: 1, savedAt: Date.now(), source: sourceBlob, crop, settings, fabric, edits };
+      saveProject(p);
+      setSaved(p);
+    }, 600);
+    return () => clearTimeout(t);
+  }, [step, sourceBlob, crop, settings, fabric, edits]);
 
   const live = (
     <p aria-live="polite" className="sr-only">
@@ -75,6 +136,19 @@ export default function PatternTool() {
         {live}
         <Uploader onFile={onFile} disabled={status === "loading"} />
         {status === "loading" && <p className="mt-4 text-center font-semibold">Opening your photo…</p>}
+        {saved && status !== "loading" && (
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-sm">
+            <button
+              onClick={() => restore(saved)}
+              className="rounded-lg border-2 border-dashed border-madder px-4 py-2 font-semibold text-madder hover:bg-aida-deep"
+            >
+              Continue your last pattern
+            </button>
+            <span className="text-muted">
+              saved {new Date(saved.savedAt).toLocaleDateString(undefined, { day: "numeric", month: "short" })} on this device
+            </span>
+          </div>
+        )}
         {error && (
           <p role="alert" className="mx-auto mt-4 max-w-md text-center font-semibold text-madder">
             {error}
@@ -99,9 +173,6 @@ export default function PatternTool() {
     );
   }
 
-  const wIn = pattern ? finishedSizeInches(pattern.width, fabric) : 0;
-  const hIn = pattern ? finishedSizeInches(pattern.height, fabric) : 0;
-
   return (
     <div>
       {live}
@@ -114,39 +185,35 @@ export default function PatternTool() {
         </button>
       </div>
       <div className="grid gap-5 md:grid-cols-[280px_minmax(0,1fr)]">
-        <div className="h-fit rounded-xl border-2 border-dashed border-hoop-dark/50 bg-linen p-4">
-          <Settings value={settings} onChange={setSettings}>
-            <div>
-              <label htmlFor="set-fabric" className="text-sm font-semibold">
-                Fabric count
-              </label>
-              <select
-                id="set-fabric"
-                value={fabric}
-                onChange={(e) => setFabric(Number(e.currentTarget.value) as FabricCount)}
-                className="mt-1 w-full rounded-md border border-charcoal/30 bg-linen px-2 py-1.5"
-              >
-                {FABRIC_COUNTS.map((c) => (
-                  <option key={c} value={c}>
-                    {c}-count Aida
-                  </option>
-                ))}
-              </select>
-            </div>
-          </Settings>
+        <div className="space-y-5">
+          <Panel title="Settings">
+            <Settings value={settings} onChange={setSettings}>
+              <div>
+                <label htmlFor="set-fabric" className="text-sm font-semibold">
+                  Fabric count
+                </label>
+                <select
+                  id="set-fabric"
+                  value={fabric}
+                  onChange={(e) => setFabric(Number(e.currentTarget.value) as FabricCount)}
+                  className="mt-1 w-full rounded-md border border-charcoal/30 bg-linen px-2 py-1.5"
+                >
+                  {FABRIC_COUNTS.map((c) => (
+                    <option key={c} value={c}>
+                      {c}-count Aida
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </Settings>
+          </Panel>
           {pattern && (
-            <p className="mt-4 border-t border-dashed border-hoop-dark/40 pt-3 text-sm">
-              <strong>
-                {pattern.width} × {pattern.height} stitches
-              </strong>
-              , {pattern.palette.length} colours.
-              <br />
-              Finished size {wIn.toFixed(1)} × {hIn.toFixed(1)} in ({inchesToCm(wIn).toFixed(1)} ×{" "}
-              {inchesToCm(hIn).toFixed(1)} cm).
-            </p>
+            <Panel title="Size">
+              <SizePanel width={pattern.width} height={pattern.height} fabric={fabric} />
+            </Panel>
           )}
         </div>
-        <div className="min-w-0">
+        <div className="min-w-0 space-y-5">
           {pattern ? (
             <div className={status === "working" ? "opacity-70 transition-opacity" : undefined}>
               <Preview pattern={pattern} label="Your pattern" height={460} />
@@ -157,18 +224,29 @@ export default function PatternTool() {
             </div>
           )}
           {error && (
-            <p role="alert" className="mt-3 font-semibold text-madder">
+            <p role="alert" className="font-semibold text-madder">
               {error}
             </p>
+          )}
+          {pattern && (
+            <Panel title="Download">
+              <ExportPanel pattern={pattern} fabric={fabric} />
+            </Panel>
           )}
         </div>
       </div>
       {pattern && (
-        <div className="mt-6 rounded-xl border-2 border-dashed border-hoop-dark/50 bg-linen p-4">
-          <h2 className="font-serif text-xl font-bold">Colour key</h2>
-          <div className="mt-2">
-            <ColorKey palette={pattern.palette} />
-          </div>
+        <div className="mt-5">
+          <Panel title="Colour key and shopping list">
+            <ColorKey
+              palette={pattern.palette}
+              fabric={fabric}
+              edited={edits.length > 0}
+              onReset={() => setEdits([])}
+              onMerge={(from, into) => setEdits((e) => [...e, { type: "merge", from, into }])}
+              onSwap={(from, to) => setEdits((e) => [...e, { type: "swap", from, to }])}
+            />
+          </Panel>
         </div>
       )}
     </div>

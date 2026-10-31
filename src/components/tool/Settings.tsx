@@ -5,6 +5,7 @@ import { MAX_WIDTH, MIN_WIDTH } from "@/lib/pattern/grid";
 import type { PatternSettings } from "@/lib/pattern/pipeline";
 
 export const MIN_COLOURS = 5;
+// TODO(pro): a Pro licence key could lift these limits (wider than MAX_WIDTH, more than 40 colours).
 export const MAX_COLOURS = 40;
 
 type Props = {
