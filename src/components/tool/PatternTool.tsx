@@ -8,14 +8,19 @@ import { Preview } from "./Preview";
 import { ColorKey } from "./ColorKey";
 import { SizePanel } from "./SizePanel";
 import { defaultPaper, ExportPanel } from "./ExportPanel";
+import { BeforeAfter } from "./BeforeAfter";
 import type { Paper } from "@/lib/pdf/buildPdf";
 import { DEFAULT_SETTINGS, type Pattern, type PatternSettings } from "@/lib/pattern/pipeline";
 import { cropSource, loadFile, loadSource, runPattern, type CropRect, type SourceImage } from "@/lib/pattern/runner";
-import { FABRIC_COUNTS, type FabricCount } from "@/lib/pattern/fabric";
+import type { FabricCount } from "@/lib/pattern/fabric";
 import { applyEdits, type ColourEdit } from "@/lib/pattern/edit";
 import { clearProject, encodeSource, loadProject, saveProject, type SavedProject } from "@/lib/storage/project";
 
 type Step = "upload" | "crop" | "pattern";
+
+// "Optimise for a face": at least this many stitches wide, and this many colours
+const OPTIMISED_WIDTH = 120;
+const OPTIMISED_COLOURS = 30;
 
 const ACCEPTED = /^image\/(jpeg|png|webp|heic|heif)$/i;
 
@@ -37,6 +42,8 @@ export default function PatternTool() {
   const [settings, setSettings] = useState<PatternSettings>(DEFAULT_SETTINGS);
   const [fabric, setFabric] = useState<FabricCount>(14);
   const [paper, setPaper] = useState<Paper>(defaultPaper);
+  // Shows the "crop closer" hint after "Optimise for a face", until a new photo
+  const [optimised, setOptimised] = useState(false);
   const [edits, setEdits] = useState<ColourEdit[]>([]);
   const [base, setBase] = useState<Pattern | null>(null);
   const [saved, setSaved] = useState<SavedProject | null>(null);
@@ -56,6 +63,7 @@ export default function PatternTool() {
     setCrop(undefined);
     setBase(null);
     setEdits([]);
+    setOptimised(false);
     setStep("crop");
     if (!blob) encodeSource(src).then(setSourceBlob).catch(() => setSourceBlob(null));
   };
@@ -189,25 +197,13 @@ export default function PatternTool() {
       <div className="grid gap-5 md:grid-cols-[280px_minmax(0,1fr)]">
         <div className="space-y-5">
           <Panel title="Settings">
-            <Settings value={settings} onChange={setSettings}>
-              <div>
-                <label htmlFor="set-fabric" className="text-sm font-semibold">
-                  Fabric count
-                </label>
-                <select
-                  id="set-fabric"
-                  value={fabric}
-                  onChange={(e) => setFabric(Number(e.currentTarget.value) as FabricCount)}
-                  className="mt-1 w-full rounded-md border border-charcoal/30 bg-linen px-2 py-1.5"
-                >
-                  {FABRIC_COUNTS.map((c) => (
-                    <option key={c} value={c}>
-                      {c}-count Aida
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </Settings>
+            <Settings
+              value={settings}
+              onChange={setSettings}
+              fabric={fabric}
+              onFabricChange={setFabric}
+              aspect={cropped ? cropped.height / cropped.width : undefined}
+            />
           </Panel>
           {pattern && (
             <Panel title="Size">
@@ -236,8 +232,32 @@ export default function PatternTool() {
                   Turn on Portrait mode
                 </button>
               )}
+              <button
+                onClick={() => {
+                  setSettings({
+                    ...settings,
+                    portrait: true,
+                    simplifyBackground: true,
+                    width: Math.max(settings.width, OPTIMISED_WIDTH),
+                    maxColours: OPTIMISED_COLOURS,
+                  });
+                  setOptimised(true);
+                }}
+                className="rounded-md bg-madder px-2.5 py-1 font-semibold text-linen hover:bg-madder-dark"
+              >
+                Optimise for a face
+              </button>
             </p>
           )}
+          {optimised && (
+            <p className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border-2 border-dashed border-sage bg-linen px-3 py-2 text-sm">
+              <span>Optimised for a face. Crop closer to the face for more detail.</span>
+              <button onClick={() => setStep("crop")} className="font-semibold text-madder underline underline-offset-2">
+                Adjust crop
+              </button>
+            </p>
+          )}
+          {pattern && cropped && <BeforeAfter photo={cropped} pattern={pattern} />}
           {pattern ? (
             <div className={status === "working" ? "opacity-70 transition-opacity" : undefined}>
               <Preview pattern={pattern} label="Your pattern" height={460} />

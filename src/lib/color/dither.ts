@@ -9,7 +9,7 @@ export function ditherLab(
   width: number,
   height: number,
   palette: Float64Array,
-  allowedFor?: (L: number, a: number, b: number) => Uint8Array | undefined,
+  allowedFor?: (L: number, a: number, b: number, cell: number) => Uint8Array | undefined,
 ): Int16Array {
   const buf = Float32Array.from(lab);
   const out = new Int16Array(width * height);
@@ -29,7 +29,7 @@ export function ditherLab(
       const L = buf[i * 3];
       const a = buf[i * 3 + 1];
       const b = buf[i * 3 + 2];
-      const p = nearestIndex(L, a, b, palette, allowedFor?.(L, a, b));
+      const p = nearestIndex(L, a, b, palette, allowedFor?.(L, a, b, i));
       out[i] = p;
       const eL = L - palette[p * 3];
       const ea = a - palette[p * 3 + 1];

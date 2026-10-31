@@ -14,6 +14,7 @@ const MAX_CANVAS_SIDE = 4096;
 type Props = {
   pattern: Pattern;
   initialView?: View;
+  /** Index into ZOOMS; leave out to start fitted to the box */
   initialZoom?: number;
   height?: number;
   label: string;
@@ -32,21 +33,36 @@ type Pinch = {
 const dist = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.hypot(a.x - b.x, a.y - b.y);
 const midpoint = (a: { x: number; y: number }, b: { x: number; y: number }) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
 
-export function Preview({ pattern, initialView = "realistic", initialZoom = 2, height = 480, label }: Props) {
+export function Preview({ pattern, initialView = "realistic", initialZoom, height = 480, label }: Props) {
   const [view, setView] = useState<View>(initialView);
-  const [zoom, setZoom] = useState<number>(ZOOMS[initialZoom]);
+  // null = fit the whole pattern in the box
+  const [zoom, setZoom] = useState<number | null>(initialZoom === undefined ? null : ZOOMS[initialZoom]);
+  const [boxW, setBoxW] = useState(0);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const drag = useRef<{ x: number; y: number; sl: number; st: number } | null>(null);
   const pinch = useRef<Pinch | null>(null);
   // Latest zoom values for the native touch listeners, which are attached once.
-  const zoomRef = useRef({ cell: 0, maxCell: 0 });
+  const zoomRef = useRef({ cell: 0, maxCell: 0, minCell: 1 });
   // After a pinch, the scroll position to restore once the canvas is redrawn at the new size
   const pendingScroll = useRef<{ left: number; top: number } | null>(null);
 
   // Chart symbols need room; bump small zooms up when on the chart tab.
   const maxCell = Math.min(MAX_CELL, Math.floor(MAX_CANVAS_SIDE / Math.max(pattern.width, pattern.height)));
-  const cell = Math.min(view === "chart" ? Math.max(zoom, 12) : zoom, maxCell);
+  const fitCell = boxW
+    ? Math.max(1, Math.floor(Math.min((boxW - 2) / pattern.width, (height - 2) / pattern.height) * 4) / 4)
+    : ZOOMS[2];
+  const minCell = Math.min(MIN_CELL, fitCell);
+  const base = zoom ?? fitCell;
+  const cell = Math.min(view === "chart" ? Math.max(base, 12) : base, maxCell);
+
+  useEffect(() => {
+    const box = scrollRef.current;
+    if (!box) return;
+    const ro = new ResizeObserver(() => setBoxW(box.clientWidth));
+    ro.observe(box);
+    return () => ro.disconnect();
+  }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -71,15 +87,14 @@ export function Preview({ pattern, initialView = "realistic", initialZoom = 2, h
     }
   }, [pattern, view, cell]);
 
-  const stepZoom = (dir: 1 | -1) =>
-    setZoom((z) => {
-      const next = dir > 0 ? ZOOMS.find((s) => s > z) : [...ZOOMS].reverse().find((s) => s < z);
-      return next ?? z;
-    });
+  const stepZoom = (dir: 1 | -1) => {
+    const next = dir > 0 ? ZOOMS.find((z) => z > cell) : [...ZOOMS].reverse().find((z) => z < cell);
+    setZoom(next ?? (dir < 0 ? null : cell));
+  };
 
   useEffect(() => {
-    zoomRef.current = { cell, maxCell };
-  }, [cell, maxCell]);
+    zoomRef.current = { cell, maxCell, minCell };
+  }, [cell, maxCell, minCell]);
 
   // Two-finger pinch and pan. Native listeners, because only they may call
   // preventDefault to stop the browser zooming the page. One finger is left
@@ -114,7 +129,7 @@ export function Preview({ pattern, initialView = "realistic", initialZoom = 2, h
       e.preventDefault();
       const [a, b] = pts(e);
       p.mid = midpoint(a, b);
-      p.scale = Math.min(zoomRef.current.maxCell / p.cell0, Math.max(MIN_CELL / p.cell0, dist(a, b) / p.d0));
+      p.scale = Math.min(zoomRef.current.maxCell / p.cell0, Math.max(zoomRef.current.minCell / p.cell0, dist(a, b) / p.d0));
       if (canvasRef.current) {
         canvasRef.current.style.transform = `translate(${p.mid.x - p.mid0.x}px, ${p.mid.y - p.mid0.y}px) scale(${p.scale})`;
       }
@@ -124,8 +139,8 @@ export function Preview({ pattern, initialView = "realistic", initialZoom = 2, h
       const p = pinch.current;
       if (!p || e.touches.length >= 2) return;
       pinch.current = null;
-      const { cell: c, maxCell: m } = zoomRef.current;
-      const next = Math.round(Math.min(m, Math.max(MIN_CELL, p.cell0 * p.scale)) * 2) / 2;
+      const { cell: c, maxCell: m, minCell: lo } = zoomRef.current;
+      const next = Math.round(Math.min(m, Math.max(lo, p.cell0 * p.scale)) * 2) / 2;
       const r = box.getBoundingClientRect();
       // Keep the stitch that was under the fingers under their final midpoint.
       const target = {
@@ -189,8 +204,15 @@ export function Preview({ pattern, initialView = "realistic", initialZoom = 2, h
         </div>
         <div className="flex items-center gap-1">
           <button
+            onClick={() => setZoom(null)}
+            disabled={zoom === null}
+            className="h-8 rounded-md px-2 text-sm font-semibold hover:bg-aida-deep disabled:opacity-40"
+          >
+            Fit
+          </button>
+          <button
             onClick={() => stepZoom(-1)}
-            disabled={cell <= MIN_CELL}
+            disabled={cell <= minCell}
             aria-label="Zoom out"
             className="h-8 w-8 rounded-md text-lg font-bold hover:bg-aida-deep disabled:opacity-40"
           >

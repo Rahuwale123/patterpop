@@ -18,7 +18,44 @@ export function isDark(hex: string): boolean {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b < 140;
 }
 
+// Below this many screen pixels per stitch, individual stitches are too small to
+// read; drawn as Xs they turn into a muddy dot pattern. Draw smooth colour
+// blocks with a faint weave instead, and save the full stitch look for zoom-in.
+export const SMOOTH_BELOW = 10;
+
+function drawSmooth(ctx: CanvasRenderingContext2D, p: Pattern, cell: number): void {
+  const { width, height, cells, palette } = p;
+  ctx.fillStyle = FABRIC;
+  ctx.fillRect(0, 0, width * cell, height * cell);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const c = cells[y * width + x];
+      if (c === EMPTY) continue;
+      ctx.fillStyle = palette[c].hex;
+      // Slight overdraw hides hairline seams between blocks at fractional sizes
+      ctx.fillRect(x * cell, y * cell, cell + 0.5, cell + 0.5);
+    }
+  }
+  if (cell < 4) return;
+  // Very soft stitch texture: one faint highlight per stitch, no holes.
+  ctx.strokeStyle = "rgb(255 255 255 / 0.1)";
+  ctx.lineWidth = Math.max(1, cell * 0.3);
+  ctx.beginPath();
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      if (cells[y * width + x] === EMPTY) continue;
+      ctx.moveTo(x * cell + cell * 0.2, y * cell + cell * 0.2);
+      ctx.lineTo(x * cell + cell * 0.8, y * cell + cell * 0.8);
+    }
+  }
+  ctx.stroke();
+}
+
 export function drawRealistic(ctx: CanvasRenderingContext2D, p: Pattern, cell: number): void {
+  if (cell < SMOOTH_BELOW) {
+    drawSmooth(ctx, p, cell);
+    return;
+  }
   const { width, height, cells, palette } = p;
   ctx.fillStyle = FABRIC;
   ctx.fillRect(0, 0, width * cell, height * cell);

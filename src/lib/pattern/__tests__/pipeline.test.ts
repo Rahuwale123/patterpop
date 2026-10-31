@@ -64,3 +64,17 @@ describe("buildPattern", () => {
     expect(performance.now() - t0).toBeLessThan(5000);
   });
 });
+
+describe("simplify background", () => {
+  it("limits the outer area to a few threads and keeps the colour count", () => {
+    const img = gradient(400, 400);
+    const p = buildPattern(img, 400, 400, { ...DEFAULT_SETTINGS, maxColours: 20, simplifyBackground: true });
+    expect(p.palette.length).toBe(20);
+    // Colours used in the corners (always outside the subject ellipse)
+    const corners = new Set<number>();
+    for (const [x0, y0] of [[0, 0], [70, 0], [0, 70], [70, 70]]) {
+      for (let y = y0; y < y0 + 10; y++) for (let x = x0; x < x0 + 10; x++) corners.add(p.cells[y * 80 + x]);
+    }
+    expect(corners.size).toBeLessThanOrEqual(3);
+  });
+});

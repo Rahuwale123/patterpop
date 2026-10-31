@@ -18,6 +18,8 @@ export type PatternSettings = {
   portrait: boolean;
   /** Portrait mode only: cooler (negative) to warmer (positive) skin, 0 = as corrected */
   skinWarmth: number;
+  /** Give the outer area only a few threads, so more colours go to the subject. */
+  simplifyBackground: boolean;
   seed: number;
 };
 
@@ -29,6 +31,7 @@ export const DEFAULT_SETTINGS: PatternSettings = {
   skipWhiteBackground: false,
   portrait: false,
   skinWarmth: 0,
+  simplifyBackground: false,
   seed: 1,
 };
 
@@ -58,7 +61,7 @@ const FRINGE_L = 78;
 const FRINGE_CHROMA = 25;
 
 // Portrait mode: stitches near the centre count up to this many times more when choosing colours.
-const PORTRAIT_CENTRE_BOOST = 3;
+const PORTRAIT_CENTRE_BOOST = 5;
 const PORTRAIT_SIGMA = 0.28;
 
 // Splitting a cluster to make up the colour count only happens if its two halves differ visibly.
@@ -71,6 +74,33 @@ const FACE_SKIN_SHARE = 0.12;
 
 // After cleanup removes rarely used threads, try this many times to restore the colour count.
 const CLEANUP_TOP_UP_ROUNDS = 3;
+
+// "Simplify background": the subject is the central ellipse (radii as a share of
+// width and height); everything outside shares a small set of threads.
+const SUBJECT_RX = 0.4;
+const SUBJECT_RY = 0.46;
+const backgroundColours = (k: number) => Math.max(2, Math.min(5, Math.round(k * 0.15)));
+// Stitches inside the ellipse this close to a background thread count as background
+// too, so the background doesn't change texture at the ellipse edge.
+const BACKGROUND_LIKE_DE = 7;
+
+function subjectMask(width: number, height: number): Uint8Array {
+  const m = new Uint8Array(width * height);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const dx = ((x + 0.5) / width - 0.5) / SUBJECT_RX;
+      const dy = ((y + 0.5) / height - 0.5) / SUBJECT_RY;
+      m[y * width + x] = dx * dx + dy * dy <= 1 ? 1 : 0;
+    }
+  }
+  return m;
+}
+
+function gather(lab: Float32Array, idx: number[]): Float32Array {
+  const out = new Float32Array(idx.length * 3);
+  idx.forEach((p, j) => out.set(lab.subarray(p * 3, p * 3 + 3), j * 3));
+  return out;
+}
 
 /** DMC threads that skin-like colours may map to. */
 const SKIN_SAFE_DMC = Uint8Array.from(DMC, (f) => (isSkinSafeThread(f.lab[0], f.lab[1], f.lab[2]) ? 1 : 0));
@@ -114,13 +144,33 @@ export function buildPattern(rgba: Uint8ClampedArray, srcW: number, srcH: number
   const lab = portrait ? correctPortrait(raw, width, height, s.skinWarmth) : raw;
   const weights = portrait ? centreWeights(width, height) : undefined;
 
-  // 3. k-means++ in Lab with CIEDE2000, down to N colours.
-  const { centres } = kmeans(lab, s.maxColours, s.seed, 30, weights);
-
-  // 4. Map each cluster to DMC. Clusters that land on the same thread merge.
-  const centreDmc = Array.from({ length: centres.length / 3 }, (_, c) =>
-    matchDmc(centres[c * 3], centres[c * 3 + 1], centres[c * 3 + 2], portrait),
-  );
+  // 3–4. k-means++ in Lab with CIEDE2000, then map each cluster to DMC
+  // (clusters that land on the same thread merge). With "Simplify background"
+  // the outer area is clustered on its own into a few threads.
+  const toDmc = (c: Float64Array) =>
+    Array.from({ length: c.length / 3 }, (_, j) => matchDmc(c[j * 3], c[j * 3 + 1], c[j * 3 + 2], portrait));
+  // `inner` ends up 1 for subject stitches and 0 for background ones.
+  const inner = s.simplifyBackground ? subjectMask(width, height) : undefined;
+  let centreDmc: number[];
+  let bgThreads: Set<number> | undefined;
+  if (inner) {
+    const outerIdx: number[] = [];
+    for (let i = 0; i < n; i++) if (!inner[i]) outerIdx.push(i);
+    bgThreads = new Set(toDmc(kmeans(gather(lab, outerIdx), backgroundColours(s.maxColours), s.seed, 30).centres));
+    const bgLab = [...bgThreads].map((d) => DMC[d].lab);
+    const innerIdx: number[] = [];
+    for (let i = 0; i < n; i++) {
+      if (!inner[i]) continue;
+      const near = bgLab.some((f) => deltaE2000(lab[i * 3], lab[i * 3 + 1], lab[i * 3 + 2], f[0], f[1], f[2]) < BACKGROUND_LIKE_DE);
+      if (near) inner[i] = 0;
+      else innerIdx.push(i);
+    }
+    const fgWeights = weights ? Float32Array.from(innerIdx, (i) => weights[i]) : undefined;
+    const fgK = Math.max(1, s.maxColours - bgThreads.size);
+    centreDmc = innerIdx.length ? [...bgThreads, ...toDmc(kmeans(gather(lab, innerIdx), fgK, s.seed, 30, fgWeights).centres)] : [...bgThreads];
+  } else {
+    centreDmc = toDmc(kmeans(lab, s.maxColours, s.seed, 30, weights).centres);
+  }
 
   // 5. Give every stitch its nearest thread. Skin-like stitches stay on warm threads.
   const threads = [...new Set(centreDmc)];
@@ -129,6 +179,7 @@ export function buildPattern(rgba: Uint8ClampedArray, srcW: number, srcH: number
   const skinStitch = Uint8Array.from({ length: n }, (_, i) => (isSkinLike(lab[i * 3], lab[i * 3 + 1], lab[i * 3 + 2], portrait) ? 1 : 0));
   const tryThread = (i: number, t: number): boolean => {
     if (skinStitch[i] && !SKIN_SAFE_DMC[threads[t]]) return false;
+    if (inner && bgThreads && !inner[i] && !bgThreads.has(threads[t])) return false;
     const f = DMC[threads[t]].lab;
     const d = deltaE2000(lab[i * 3], lab[i * 3 + 1], lab[i * 3 + 2], f[0], f[1], f[2]);
     if (d >= bestD[i]) return false;
@@ -193,7 +244,11 @@ export function buildPattern(rgba: Uint8ClampedArray, srcW: number, srcH: number
   if (s.dither) {
     const paletteLab = Float64Array.from(dmcIdx.flatMap((d) => DMC[d].lab));
     const paletteSkinSafe = Uint8Array.from(dmcIdx, (d) => SKIN_SAFE_DMC[d]);
-    out = ditherLab(lab, width, height, paletteLab, (L, a, b) => (isSkinLike(L, a, b, portrait) ? paletteSkinSafe : undefined));
+    const paletteBg = Uint8Array.from(dmcIdx, (d) => (bgThreads?.has(d) ? 1 : 0));
+    out = ditherLab(lab, width, height, paletteLab, (L, a, b, i) => {
+      if (inner && !inner[i]) return paletteBg;
+      return isSkinLike(L, a, b, portrait) ? paletteSkinSafe : undefined;
+    });
   }
 
   // 6. Cleanup of isolated stitches. A thread used only for scattered single
