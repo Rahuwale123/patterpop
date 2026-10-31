@@ -239,15 +239,40 @@ export function buildPattern(rgba: Uint8ClampedArray, srcW: number, srcH: number
   };
   splitUntilCount();
 
+  // Drop threads that ended up with no stitches, so nothing below (dithering in
+  // particular) can bring them back and go over the colour count.
+  const usedThreads = [...new Set(cells)].sort((x, y) => x - y);
+  const remap = new Int16Array(threads.length).fill(EMPTY);
+  usedThreads.forEach((t, j) => (remap[t] = j));
+  for (let i = 0; i < n; i++) cells[i] = remap[cells[i]];
+  // Renumber in place: the cleanup top-up below keeps using `threads` and `unsplittable`.
+  const kept = usedThreads.map((t) => threads[t]);
+  threads.length = 0;
+  threads.push(...kept);
+  const stillUnsplittable = [...unsplittable].filter((t) => remap[t] !== EMPTY).map((t) => remap[t]);
+  unsplittable.clear();
+  stillUnsplittable.forEach((t) => unsplittable.add(t));
   const dmcIdx = threads;
+
+  const isLightThread = (p: number) => {
+    const [L, a, b] = DMC[dmcIdx[p]].lab;
+    return L >= LIGHT_L && Math.hypot(a, b) <= LIGHT_CHROMA;
+  };
+  // Edge stitches that are mostly background blended with the subject
+  const isFringe = (i: number) => lab[i * 3] >= FRINGE_L && Math.hypot(lab[i * 3 + 1], lab[i * 3 + 2]) <= FRINGE_CHROMA;
+
   let out: Int16Array = cells;
   if (s.dither) {
+    // Background areas (a cleared white background, or the simplified outer
+    // area) aren't dithered: they stay calm and keep their plain threads.
+    const fixed = s.skipWhiteBackground ? clearLightBackground(cells, width, height, isLightThread, isFringe) : cells;
+    const skip = Uint8Array.from(fixed, (v, i) => (v === EMPTY || (inner && !inner[i]) ? 1 : 0));
     const paletteLab = Float64Array.from(dmcIdx.flatMap((d) => DMC[d].lab));
     const paletteSkinSafe = Uint8Array.from(dmcIdx, (d) => SKIN_SAFE_DMC[d]);
-    const paletteBg = Uint8Array.from(dmcIdx, (d) => (bgThreads?.has(d) ? 1 : 0));
-    out = ditherLab(lab, width, height, paletteLab, (L, a, b, i) => {
-      if (inner && !inner[i]) return paletteBg;
-      return isSkinLike(L, a, b, portrait) ? paletteSkinSafe : undefined;
+    out = ditherLab(lab, width, height, paletteLab, {
+      skip,
+      fixed,
+      allowedFor: (L, a, b) => (isSkinLike(L, a, b, portrait) ? paletteSkinSafe : undefined),
     });
   }
 
@@ -263,17 +288,7 @@ export function buildPattern(rgba: Uint8ClampedArray, srcW: number, srcH: number
   }
 
   if (s.skipWhiteBackground) {
-    out = clearLightBackground(
-      out,
-      width,
-      height,
-      (p) => {
-        const [L, a, b] = DMC[dmcIdx[p]].lab;
-        return L >= LIGHT_L && Math.hypot(a, b) <= LIGHT_CHROMA;
-      },
-      // Edge stitches that are mostly background blended with the subject
-      (i) => lab[i * 3] >= FRINGE_L && Math.hypot(lab[i * 3 + 1], lab[i * 3 + 2]) <= FRINGE_CHROMA,
-    );
+    out = clearLightBackground(out, width, height, isLightThread, isFringe);
   }
 
   return { ...compactPalette(out, dmcIdx, width, height), faceLikely: centreSkinShare(raw, width, height) >= FACE_SKIN_SHARE };

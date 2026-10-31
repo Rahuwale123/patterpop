@@ -61,6 +61,21 @@ Preview the production build: `npx serve out`.
 - Swap `/public/samples/*.jpg` for your own photos, then regenerate the before/after WebPs
   (run the pipeline in `/dev/compare` and export the realistic previews at 480 px).
 
+## Sample photos
+
+The before/after examples and `/dev/compare` use three local photos in `public/samples/` (no images are
+loaded from other sites). They are from Unsplash, under the [Unsplash Licence](https://unsplash.com/license),
+which allows commercial use without attribution:
+
+| File | Photographer | Source |
+|---|---|---|
+| `pet.jpg` | Matthew Wiebe | https://unsplash.com/photos/U5rMrSI7Pn4 |
+| `portrait.jpg` | Alexander Shustov | https://unsplash.com/photos/AHBiSKaENwc |
+| `flower.jpg` | Steven Spassov | https://unsplash.com/photos/tVIqMgGlAG0 |
+
+The `*-photo.webp` and `*-pattern.webp` files are generated from them by the pattern pipeline at default
+settings. Replace them with your own photos before launch if you prefer.
+
 ## Where things live
 
 - `src/lib/color`: Lab conversion, CIEDE2000, seeded k-means++, dithering, stray-stitch cleanup

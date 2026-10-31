@@ -38,14 +38,14 @@ const samples = [
     label: "A summer portrait",
     alt: "A woman in sunglasses holding daisies in a field",
     patternAlt: "The portrait as a stitched cross stitch pattern",
-    stitches: "80 × 80 stitches, 19 colours",
+    stitches: "80 × 80 stitches, 20 colours",
   },
   {
     slug: "flower",
     label: "A purple petunia",
     alt: "A purple petunia flower against dark leaves",
     patternAlt: "The petunia as a stitched cross stitch pattern",
-    stitches: "80 × 80 stitches, 14 colours",
+    stitches: "80 × 80 stitches, 20 colours",
   },
 ];
 

@@ -301,6 +301,9 @@ export function Settings({ value, onChange, fabric, onFabricChange, aspect }: Pr
           // Cleanup removes the scattered stitches dithering relies on, so switch it off (it can be turned back on).
           onChange={(v) => onChange(v ? { ...value, dither: true, cleanup: false } : { ...value, dither: false })}
         />
+        <p className="-mt-1 pl-6 text-xs text-muted">
+          Mixes two close threads to fake in-between shades. Good for skies and soft gradients; can make faces speckled.
+        </p>
         <Toggle
           id="set-bg"
           label="Leave white background unstitched"

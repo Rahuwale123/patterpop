@@ -28,7 +28,7 @@
 {"code":"818","name":"Baby Pink","hex":"#FFDFD9"},
 {"code":"957","name":"Geranium Pale","hex":"#FDB5B5"},
 {"code":"956","name":"Geranium","hex":"#FF9191"},
-{"code":"309","name":"Rose Dark","hex":"#564A4A"},
+{"code":"309","name":"Rose Dark","hex":"#BA2044"},
 {"code":"963","name":"Dusty Rose Ult Vy Lt","hex":"#FFD7D7"},
 {"code":"3716","name":"Dusty Rose Med Vy Lt","hex":"#FFBDBD"},
 {"code":"962","name":"Dusty Rose Medium","hex":"#E68A8A"},
@@ -451,4 +451,4 @@
 {"code":"317","name":"Pewter Gray","hex":"#6C6C6C"},
 {"code":"413","name":"Pewter Gray Dark","hex":"#565656"},
 {"code":"3799","name":"Pewter Gray Vy Dk","hex":"#424242"},
-{"code":"310","name":"Black","hex":"#000000"}]}
+{"code":"310","name":"Black","hex":"#000000"}],"corrections":["309 Rose Dark: upstream #564A4A is grey-brown and contradicts the name; replaced with #BA2044 (camelia.sk DMC table, via github.com/nathantspencer/DMC-ColorCodes), which agrees with makebead.com (#C12041)."]}

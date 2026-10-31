@@ -238,6 +238,9 @@ export default function PatternTool() {
                     ...settings,
                     portrait: true,
                     simplifyBackground: true,
+                    // Faces stitch best as calm areas of colour
+                    dither: false,
+                    cleanup: true,
                     width: Math.max(settings.width, OPTIMISED_WIDTH),
                     maxColours: OPTIMISED_COLOURS,
                   });

@@ -95,5 +95,25 @@ export function clearLightBackground(
     }
     for (const i of fringe) out[i] = EMPTY;
   }
+  // Single stitches stranded in the cleared background (all 8 neighbours bare).
+  // Thin lines (6 bare neighbours) are real detail and stay.
+  const stranded: number[] = [];
+  for (let i = 0; i < out.length; i++) {
+    if (out[i] === EMPTY) continue;
+    const x = i % width;
+    const y = (i - x) / width;
+    let bare = 0;
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        if (!dx && !dy) continue;
+        const nx = x + dx;
+        const ny = y + dy;
+        if (nx < 0 || ny < 0 || nx >= width || ny >= height || out[ny * width + nx] === EMPTY) bare++;
+      }
+    }
+    if (bare === 8) stranded.push(i);
+  }
+  for (const i of stranded) out[i] = EMPTY;
   return out;
 }
+

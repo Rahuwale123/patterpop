@@ -36,3 +36,11 @@ describe("fabric sizes", () => {
     expect(fabricToBuyCm(140, 14)).toBeCloseTo(25.4 + 15, 6);
   });
 });
+
+describe("DMC data", () => {
+  it("has 309 Rose Dark as a rose, not the grey from the upstream list", async () => {
+    const { DMC } = await import("../dmc");
+    const rose = DMC.find((f) => f.code === "309");
+    expect(rose?.lab[1]).toBeGreaterThan(30); // clearly red (positive a*)
+  });
+});

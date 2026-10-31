@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { isSkinSafeThread } from "@/lib/color/skin";
 import { hexToLab } from "@/lib/color/lab";
 import { buildPattern, DEFAULT_SETTINGS } from "../pipeline";
+import { mulberry32 } from "@/lib/color/random";
 
 function gradient(w: number, h: number): Uint8ClampedArray {
   const px = new Uint8ClampedArray(w * h * 4);
@@ -78,3 +79,41 @@ describe("simplify background", () => {
     expect(corners.size).toBeLessThanOrEqual(3);
   });
 });
+
+/** Speckled noise: cleanup removes whole threads, so the colour top-up has to run. */
+function noise(w: number, h: number): Uint8ClampedArray {
+  const r = mulberry32(5);
+  const px = new Uint8ClampedArray(w * h * 4);
+  for (let i = 0; i < px.length; i += 4) px.set([r() * 255, r() * 255, r() * 255, 255], i);
+  return px;
+}
+
+describe("every combination of options", () => {
+  const img = shadedSkin(240, 300);
+  const speckle = noise(240, 300);
+  const combos: Partial<typeof DEFAULT_SETTINGS>[] = [];
+  for (const portrait of [false, true])
+    for (const simplifyBackground of [false, true])
+      for (const dither of [false, true])
+        for (const cleanup of [false, true]) combos.push({ portrait, simplifyBackground, dither, cleanup });
+
+  it.each(combos)("%o accounts for every stitch and stays within the colour count", (opts) => {
+    const s = { ...DEFAULT_SETTINGS, ...opts, width: 60, maxColours: 12 };
+    for (const src of [gradientMix(img), speckle]) {
+      const p = buildPattern(src, 240, 300, s);
+      expect(p.palette.length).toBeLessThanOrEqual(12);
+      expect(p.palette.reduce((sum, c) => sum + c.count, 0)).toBe(p.width * p.height);
+      expect(Array.from(p.cells).every((c) => c >= 0 && c < p.palette.length)).toBe(true);
+    }
+  });
+});
+
+/** Mix a gradient into the test card so there are plenty of colours to choose from. */
+function gradientMix(img: Uint8ClampedArray): Uint8ClampedArray {
+  const out = Uint8ClampedArray.from(img);
+  for (let i = 0; i < out.length; i += 4) {
+    const p = i / 4;
+    out[i + 2] = (out[i + 2] + (p % 240)) / 2;
+  }
+  return out;
+}
