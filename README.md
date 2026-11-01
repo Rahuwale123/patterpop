@@ -71,9 +71,9 @@ The `*.pages.dev` address should not be indexed alongside the real domain: every
 
 ## Before launch
 
-- Replace the bracketed placeholders on `/about` with your own story. All long copy is marked
-  `{/* DRAFT: human review */}`.
-- Set up the inbox for `hello@patternpop.online` (in `src/lib/seo/site.ts`), e.g. with Cloudflare Email Routing.
+- Long copy is marked `{/* DRAFT: human review */}`; rewrite it in your own voice whenever you like.
+- The contact address lives in `src/lib/seo/site.ts` (`contactEmail`). To use `hello@patternpop.online` instead,
+  set up Cloudflare Email Routing to forward it to your inbox, then change it there.
 - Swap `/public/samples/*.jpg` for your own photos, then regenerate the before/after WebPs
   (run the pipeline in `/dev/compare` and export the realistic previews at 480 px).
 

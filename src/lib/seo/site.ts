@@ -3,7 +3,7 @@ export const site = {
   url: "https://patternpop.online",
   defaultOgImage: "/og/default.png",
   locale: "en_US",
-  contactEmail: "hello@patternpop.online",
+  contactEmail: "fthedrive@gmail.com",
 } as const;
 
 export function absoluteUrl(path: string): string {

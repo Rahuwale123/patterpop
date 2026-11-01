@@ -34,18 +34,17 @@ export default function AboutPage() {
         A small, free tool for turning photos into patterns you can actually stitch.
       </PageIntro>
 
-      {/* DRAFT: human review — replace the bracketed parts with your own story */}
+      {/* DRAFT: human review */}
       <div className="mt-8">
         <Prose>
-          <h2>Why I made it</h2>
+          <h2>Why PatternPop exists</h2>
           <p>
-            Hi, I&apos;m [your name]. I&apos;ve been stitching since [year], mostly [what you like to stitch]. A while
-            ago I wanted to turn a photo of [a pet, a place, a person] into a pattern. The free tools I tried either
-            wanted me to sign up, put a watermark on the chart, or uploaded my photo to who knows where.
+            Turning a favourite photo into a cross stitch pattern should be simple. Too many free tools ask you to
+            sign up, put a watermark on the chart, or upload your photo to a server you know nothing about.
           </p>
           <p>
-            So I built PatternPop. It does one job well: you give it a photo, it gives you a clear chart, a list of
-            DMC threads to buy, and a PDF you can print. Your photo stays on your own device the whole time.
+            PatternPop does one job well. You give it a photo, and it gives you a clear chart, a list of DMC threads
+            to buy, and a PDF you can print. Your photo stays on your own device the whole time.
           </p>
         </Prose>
 
