@@ -1,0 +1,5 @@
+{
+  "version": 1,
+  "include": ["/*"],
+  "exclude": ["/_next/*", "/samples/*", "/og/*", "/favicon.svg", "/icon.png", "/apple-touch-icon.png", "/_headers"]
+}
