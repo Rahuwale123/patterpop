@@ -115,16 +115,16 @@ export default function AboutPage() {
         </Prose>
         <Container className="mt-12">
           <p className="border-t border-dashed border-hoop-dark/40 pt-4 text-sm text-muted">
-            Credits: DMC colour data from the{" "}
-            <a href="https://github.com/sharlagelfand/dmc" rel="noopener" className="underline">
-              dmc project
+            Credits: Color data: craft-color-codes by{" "}
+            <a href="https://makebead.com/" rel="nofollow noopener" className="underline">
+              MakeBead
+            </a>
+            , used under{" "}
+            <a href="https://creativecommons.org/licenses/by/4.0/" rel="nofollow noopener" className="underline">
+              CC BY 4.0
             </a>{" "}
-            by Sharla Gelfand (MIT licence), based on{" "}
-            <a href="https://github.com/adrianj/CrossStitchCreator" rel="noopener" className="underline">
-              CrossStitchCreator
-            </a>{" "}
-            by adrianj. DMC is a trademark of DMC. PatternPop is an independent tool and isn&apos;t affiliated with
-            DMC.
+            (DMC codes, names and hex values, unchanged). DMC is a trademark of DMC. PatternPop is an independent
+            tool and isn&apos;t affiliated with DMC.
           </p>
         </Container>
       </div>

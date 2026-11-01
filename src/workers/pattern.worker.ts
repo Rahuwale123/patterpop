@@ -1,17 +1,6 @@
 /// <reference lib="webworker" />
-import { buildPattern, type Pattern, type PatternSettings } from "@/lib/pattern/pipeline";
-
-export type WorkerRequest = {
-  id: number;
-  pixels: ArrayBuffer;
-  width: number;
-  height: number;
-  settings: PatternSettings;
-};
-
-export type WorkerResponse =
-  | { id: number; ok: true; pattern: Pattern; ms: number }
-  | { id: number; ok: false; error: string };
+import { buildPattern } from "@/lib/pattern/pipeline";
+import type { WorkerRequest, WorkerResponse } from "./messages";
 
 const ctx = self as unknown as DedicatedWorkerGlobalScope;
 

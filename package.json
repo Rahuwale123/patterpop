@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "audit:seo": "node scripts/audit-seo.mjs"
+    "audit:seo": "node scripts/audit-seo.mjs",
+    "postbuild": "node scripts/clean-out.mjs"
   },
   "dependencies": {
     "clsx": "^2.1.1",

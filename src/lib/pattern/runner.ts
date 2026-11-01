@@ -1,7 +1,7 @@
 "use client";
 
 import type { Pattern, PatternSettings } from "./pipeline";
-import type { WorkerRequest, WorkerResponse } from "@/workers/pattern.worker";
+import type { WorkerRequest, WorkerResponse } from "@/workers/messages";
 
 export const MAX_SOURCE_SIDE = 1600;
 
