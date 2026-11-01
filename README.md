@@ -30,27 +30,43 @@ Preview the production build: `npx serve out`.
 
 ## Deploy to Cloudflare Pages
 
-1. Push this repo to GitHub (or GitLab).
-2. Cloudflare dashboard → **Workers & Pages** → **Create** → **Pages** → **Connect to Git** → pick the repo.
+The site is plain static files in `out/`; no server code. Cloudflare Pages serves `/about` from
+`about.html` automatically (and redirects `/about.html` to `/about`), uses `out/404.html` for missing
+pages, and applies `public/_headers` (long caching for hashed files, basic security headers).
+
+Check it locally the way Cloudflare will serve it (no account needed, nothing is published):
+
+```bash
+npm run build
+npx wrangler pages dev out     # http://localhost:8788
+```
+
+### 1. Preview deploy (a free *.pages.dev address)
+
+1. Push this repo to GitHub (private is fine).
+2. Cloudflare dashboard → **Workers & Pages** → **Create** → **Pages** → **Connect to Git** → choose the repo.
 3. Build settings:
-   - Framework preset: **None** (or Next.js (Static HTML Export))
+   - Framework preset: **None**
    - Build command: `npm run build`
    - Build output directory: `out`
-   - Environment variable: `NODE_VERSION` = `22` (or newer)
-4. Optional environment variables:
-   - `NEXT_PUBLIC_CF_BEACON`: your Cloudflare Web Analytics token. Nothing is loaded if unset.
-   - `NEXT_PUBLIC_ADS_ENABLED`: `true` turns on the reserved `AdSlot` spaces. Off by default.
-5. Save and deploy. Every push to the main branch redeploys.
+   - Environment variable: `NODE_VERSION` = `22`
+4. **Save and Deploy.** You get `https://<project>.pages.dev`. Test the tool there on a phone and a laptop.
+   Every branch other than the production branch gets its own preview URL, so you can try changes safely.
+5. Optional environment variables (Settings → Environment variables), then redeploy:
+   - `NEXT_PUBLIC_CF_BEACON`: Cloudflare Web Analytics token. Nothing is loaded if unset.
+   - `NEXT_PUBLIC_ADS_ENABLED`: `true` reserves the ad spaces. Off by default.
 
-### Connect patternpop.online
+The `*.pages.dev` address should not be indexed alongside the real domain: every page already declares
+`https://patternpop.online/...` as its canonical URL, so search engines credit the real domain.
 
-1. In the Pages project → **Custom domains** → **Set up a custom domain** → enter `patternpop.online`.
-2. If the domain's DNS is already on Cloudflare, it adds the record for you. Otherwise either move the
-   domain's nameservers to Cloudflare (recommended), or add the `CNAME` record Cloudflare shows you at your
-   registrar.
-3. Add `www.patternpop.online` too, then add a **Redirect Rule** (Rules → Redirect Rules) sending
-   `www.patternpop.online/*` to `https://patternpop.online/${1}` with a 301, so there is one canonical host.
-4. SSL is issued automatically. Under SSL/TLS, set mode to **Full** and turn on **Always Use HTTPS**.
+### 2. Connect patternpop.online
+
+1. Pages project → **Custom domains** → **Set up a custom domain** → `patternpop.online`.
+2. If the domain's DNS is on Cloudflare, the record is added for you. Otherwise move the nameservers to
+   Cloudflare (recommended), or add the `CNAME` record Cloudflare shows you at your registrar.
+3. Add `www.patternpop.online` too, then a **Redirect Rule** sending `www.patternpop.online/*` to
+   `https://patternpop.online/${1}` (301), so there is one canonical host.
+4. SSL is automatic. Under SSL/TLS set the mode to **Full** and turn on **Always Use HTTPS**.
 5. Add the site to Google Search Console and submit `https://patternpop.online/sitemap.xml`.
 
 ## Before launch
