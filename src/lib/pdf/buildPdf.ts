@@ -1,16 +1,26 @@
 import type { jsPDF as JsPDF } from "jspdf";
 import { EMPTY } from "@/lib/color/cleanup";
 import { hexToRgb } from "@/lib/color/lab";
-import { fabricToBuyCm, fabricToBuyInches, finishedSizeInches, inchesToCm, type FabricCount } from "@/lib/pattern/fabric";
-import { skeinsNeeded } from "@/lib/pattern/skeins";
-import { drawRealistic } from "@/lib/pattern/render";
+import { drawRealistic, type StitchStyle } from "@/lib/pattern/render";
 import type { Pattern } from "@/lib/pattern/pipeline";
 
 export type Paper = "a4" | "letter";
 
+/** Everything craft-specific about the PDF; see lib/crafts.ts. */
 export type PdfOptions = {
   paper: Paper;
-  fabric: FabricCount;
+  /** e.g. "Cross stitch pattern" */
+  title: string;
+  /** Label/value rows on the cover, e.g. ["Fabric", "14-count Aida"] */
+  details: [string, string][];
+  /** One line under the key heading: what the colours are and how supplies were worked out */
+  keyNote: string;
+  /** Column headings: the colour code (e.g. "DMC") and the unit counted (e.g. "Stitches") */
+  codeLabel: string;
+  countLabel: string;
+  /** Optional supplies column, e.g. skeins per colour */
+  supply?: { label: string; forCount: (count: number) => number };
+  style?: StitchStyle;
 };
 
 // Chart sections: about 50 x 70 stitches a page, with a few stitches of the
@@ -41,20 +51,18 @@ export function chartSections(p: Pattern): { sections: Section[]; across: number
   return { sections, across: xs.length, down: ys.length };
 }
 
-function previewJpeg(p: Pattern): string {
-  const cell = Math.max(2, Math.floor(900 / Math.max(p.width, p.height)));
+function previewJpeg(p: Pattern, style?: StitchStyle): string {
+  const asp = p.cellAspect ?? 1;
+  const cell = Math.max(2, Math.floor(900 / Math.max(p.width, p.height * asp)));
   const canvas = document.createElement("canvas");
   canvas.width = p.width * cell;
-  canvas.height = p.height * cell;
+  canvas.height = Math.round(p.height * asp * cell);
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("Canvas 2D is not available");
-  drawRealistic(ctx, p, cell);
+  drawRealistic(ctx, p, cell, style);
   return canvas.toDataURL("image/jpeg", 0.85);
 }
 
-function fmt(n: number): string {
-  return n.toFixed(1);
-}
 
 export async function buildPdf(p: Pattern, opts: PdfOptions): Promise<Blob> {
   const { jsPDF } = await import("jspdf");
@@ -97,35 +105,20 @@ function drawCover(
   doc.setFont("helvetica", "bold");
   doc.setFontSize(22);
   doc.setTextColor(30);
-  doc.text("Cross stitch pattern", MARGIN, y);
+  doc.text(opts.title, MARGIN, y);
   y += 8;
 
   // Preview
   const maxW = pageW - MARGIN * 2;
   const maxH = 115;
-  const scale = Math.min(maxW / p.width, maxH / p.height);
+  const asp = p.cellAspect ?? 1;
+  const scale = Math.min(maxW / p.width, maxH / (p.height * asp));
   const w = p.width * scale;
-  const h = p.height * scale;
-  doc.addImage(previewJpeg(p), "JPEG", (pageW - w) / 2, y, w, h);
+  const h = p.height * asp * scale;
+  doc.addImage(previewJpeg(p, opts.style), "JPEG", (pageW - w) / 2, y, w, h);
   y += h + 10;
 
-  const wIn = finishedSizeInches(p.width, opts.fabric);
-  const hIn = finishedSizeInches(p.height, opts.fabric);
-  const stitches = p.palette.reduce((s, c) => s + c.count, 0);
-  const skeins = p.palette.reduce((s, c) => s + skeinsNeeded(c.count, opts.fabric), 0);
-  const rows: [string, string][] = [
-    ["Design size", `${p.width} x ${p.height} stitches`],
-    ["Fabric", `${opts.fabric}-count Aida`],
-    ["Finished size", `${fmt(wIn)} x ${fmt(hIn)} in  (${fmt(inchesToCm(wIn))} x ${fmt(inchesToCm(hIn))} cm)`],
-    [
-      "Fabric to buy",
-      `${fmt(fabricToBuyInches(p.width, opts.fabric))} x ${fmt(fabricToBuyInches(p.height, opts.fabric))} in  (${fmt(
-        fabricToBuyCm(p.width, opts.fabric),
-      )} x ${fmt(fabricToBuyCm(p.height, opts.fabric))} cm), 3 in / 7.5 cm spare each side`,
-    ],
-    ["Colours", `${p.palette.length} DMC colours, ${skeins} skeins in total`],
-    ["Stitches", `${stitches.toLocaleString("en-US")} full cross stitches, 2 strands`],
-  ];
+  const rows = opts.details;
   doc.setFontSize(10);
   for (const [k, v] of rows) {
     doc.setFont("helvetica", "bold");
@@ -199,23 +192,25 @@ function drawChartPage(
   const left = MARGIN + gutter;
   const availW = pageW - left - MARGIN;
   const availH = pageH - top - MARGIN - 6;
-  const cell = Math.min(availW / cols, availH / rows);
+  const asp = p.cellAspect ?? 1;
+  const cell = Math.min(availW / cols, availH / (rows * asp));
+  const ch = cell * asp; // row height; differs from cell width for knitting
 
   // Shade the overlap strip
   doc.setFillColor(232, 232, 232);
-  if (extraCols > 0) doc.rect(left + s.cols * cell, top, extraCols * cell, rows * cell, "F");
-  if (extraRows > 0) doc.rect(left, top + s.rows * cell, s.cols * cell, extraRows * cell, "F");
+  if (extraCols > 0) doc.rect(left + s.cols * cell, top, extraCols * cell, rows * ch, "F");
+  if (extraRows > 0) doc.rect(left, top + s.rows * ch, s.cols * cell, extraRows * ch, "F");
 
   // Symbols, black and white
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(cell * 2.835 * 0.72);
+  doc.setFontSize(Math.min(cell, ch) * 2.835 * 0.72);
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       const v = p.cells[(s.y0 + r) * p.width + (s.x0 + c)];
       if (v === EMPTY) continue;
       const overlap = c >= s.cols || r >= s.rows;
       doc.setTextColor(overlap ? 120 : 0);
-      doc.text(p.palette[v].symbol, left + (c + 0.5) * cell, top + (r + 0.5) * cell, {
+      doc.text(p.palette[v].symbol, left + (c + 0.5) * cell, top + (r + 0.5) * ch, {
         align: "center",
         baseline: "middle",
       });
@@ -228,14 +223,14 @@ function drawChartPage(
     const bold = g % 10 === 0 || g === p.width;
     doc.setDrawColor(bold ? 0 : 170);
     doc.setLineWidth(bold ? 0.45 : 0.1);
-    doc.line(left + c * cell, top, left + c * cell, top + rows * cell);
+    doc.line(left + c * cell, top, left + c * cell, top + rows * ch);
   }
   for (let r = 0; r <= rows; r++) {
     const g = s.y0 + r;
     const bold = g % 10 === 0 || g === p.height;
     doc.setDrawColor(bold ? 0 : 170);
     doc.setLineWidth(bold ? 0.45 : 0.1);
-    doc.line(left, top + r * cell, left + cols * cell, top + r * cell);
+    doc.line(left, top + r * ch, left + cols * cell, top + r * ch);
   }
 
   // Edge numbers at every 10th stitch
@@ -248,7 +243,7 @@ function drawChartPage(
   }
   for (let r = 0; r <= rows; r++) {
     const g = s.y0 + r;
-    if (g % 10 === 0 && g > 0) doc.text(String(g), left - 1.5, top + r * cell, { align: "right", baseline: "middle" });
+    if (g % 10 === 0 && g > 0) doc.text(String(g), left - 1.5, top + r * ch, { align: "right", baseline: "middle" });
   }
 
   // Centre marks: small arrows pointing at the middle of the design, if it's on this page
@@ -260,7 +255,7 @@ function drawChartPage(
     doc.triangle(x - 1.5, top - 6, x + 1.5, top - 6, x, top - 4, "F");
   }
   if (midY >= s.y0 && midY <= s.y0 + rows) {
-    const y = top + (midY - s.y0) * cell;
+    const y = top + (midY - s.y0) * ch;
     doc.triangle(left - 7, y - 1.5, left - 7, y + 1.5, left - 5, y, "F");
   }
 
@@ -270,7 +265,7 @@ function drawChartPage(
   const neighbours: string[] = [];
   if (extraCols > 0) neighbours.push(`right: page ${firstChartPage + s.index + 1}`);
   if (extraRows > 0) neighbours.push(`below: page ${firstChartPage + s.index + across}`);
-  if (neighbours.length) doc.text(`Continues ${neighbours.join(", ")}`, left, top + rows * cell + 5);
+  if (neighbours.length) doc.text(`Continues ${neighbours.join(", ")}`, left, top + rows * ch + 5);
   doc.setTextColor(30);
 }
 
@@ -286,14 +281,22 @@ function drawKey(doc: JsPDF, p: Pattern, opts: PdfOptions, pageW: number, pageH:
   doc.setFontSize(9);
   doc.setTextColor(90);
   doc.text(
-    `DMC six-strand embroidery floss. Skeins assume 2 strands on ${opts.fabric}-count with 10% spare. Colours on screen and paper are approximate.`,
+    opts.keyNote,
     MARGIN,
     y,
     { maxWidth: pageW - MARGIN * 2 },
   );
   y += 10;
 
-  const colX = { sym: MARGIN, sw: MARGIN + 14, code: MARGIN + 30, name: MARGIN + 50, st: pageW - MARGIN - 22, sk: pageW - MARGIN };
+  // Without a supplies column, the count sits at the right edge.
+  const colX = {
+    sym: MARGIN,
+    sw: MARGIN + 14,
+    code: MARGIN + 30,
+    name: MARGIN + 50,
+    st: opts.supply ? pageW - MARGIN - 26 : pageW - MARGIN,
+    sk: pageW - MARGIN,
+  };
   const header = (continued = false) => {
     if (continued) {
       doc.setFont("helvetica", "bold");
@@ -307,10 +310,10 @@ function drawKey(doc: JsPDF, p: Pattern, opts: PdfOptions, pageW: number, pageH:
     doc.setTextColor(30);
     doc.text("Symbol", colX.sym, y);
     doc.text("Colour", colX.sw, y);
-    doc.text("DMC", colX.code, y);
+    doc.text(opts.codeLabel, colX.code, y);
     doc.text("Name", colX.name, y);
-    doc.text("Stitches", colX.st, y, { align: "right" });
-    doc.text("Skeins", colX.sk, y, { align: "right" });
+    doc.text(opts.countLabel, colX.st, y, { align: "right" });
+    if (opts.supply) doc.text(opts.supply.label, colX.sk, y, { align: "right" });
     y += 2;
     doc.setDrawColor(30);
     doc.setLineWidth(0.3);
@@ -320,15 +323,15 @@ function drawKey(doc: JsPDF, p: Pattern, opts: PdfOptions, pageW: number, pageH:
   header();
 
   const rowH = 7;
-  let totalSkeins = 0;
+  let totalSupply = 0;
   for (const c of p.palette) {
     if (y > pageH - MARGIN - 18) {
       doc.addPage();
       y = MARGIN + 6;
       header(true);
     }
-    const skeins = skeinsNeeded(c.count, opts.fabric);
-    totalSkeins += skeins;
+    const supply = opts.supply?.forCount(c.count) ?? 0;
+    totalSupply += supply;
     doc.setDrawColor(30);
     doc.setLineWidth(0.2);
     doc.rect(colX.sym, y - 4, 5.5, 5.5, "S");
@@ -344,7 +347,7 @@ function drawKey(doc: JsPDF, p: Pattern, opts: PdfOptions, pageW: number, pageH:
     doc.setFont("helvetica", "normal");
     doc.text(c.name, colX.name, y, { maxWidth: colX.st - colX.name - 20 });
     doc.text(c.count.toLocaleString("en-US"), colX.st, y, { align: "right" });
-    doc.text(String(skeins), colX.sk, y, { align: "right" });
+    if (opts.supply) doc.text(supply.toLocaleString("en-US"), colX.sk, y, { align: "right" });
     doc.setDrawColor(200);
     doc.setLineWidth(0.1);
     doc.line(MARGIN, y + 2.5, pageW - MARGIN, y + 2.5);
@@ -353,5 +356,5 @@ function drawKey(doc: JsPDF, p: Pattern, opts: PdfOptions, pageW: number, pageH:
   y += 2;
   doc.setFont("helvetica", "bold");
   doc.text(`${p.palette.length} colours`, colX.name, y);
-  doc.text(`${totalSkeins} skeins`, colX.sk, y, { align: "right" });
+  if (opts.supply) doc.text(`${totalSupply.toLocaleString("en-US")} ${opts.supply.label.toLowerCase()}`, colX.sk, y, { align: "right" });
 }

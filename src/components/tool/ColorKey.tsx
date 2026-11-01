@@ -3,14 +3,18 @@
 import { useId, useMemo, useState, type ReactNode } from "react";
 import { deltaE2000Lab } from "@/lib/color/ciede2000";
 import { hexToLab } from "@/lib/color/lab";
-import { DMC } from "@/lib/pattern/dmc";
-import type { FabricCount } from "@/lib/pattern/fabric";
+import type { Colour } from "@/lib/pattern/palettes";
 import type { PaletteEntry } from "@/lib/pattern/pipeline";
-import { skeinsNeeded } from "@/lib/pattern/skeins";
 
 type Props = {
   palette: PaletteEntry[];
-  fabric: FabricCount;
+  /** Colours offered by "Swap"; leave out when there's no fixed range (yarn) */
+  swapColours?: Colour[];
+  codeLabel: string;
+  countLabel: string;
+  /** Supplies column, e.g. skeins. Without it, each colour's share is shown instead. */
+  supply?: { label: string; forCount: (count: number) => number };
+  note: string;
   onMerge: (from: string, into: string) => void;
   onSwap: (from: string, to: string) => void;
   edited: boolean;
@@ -24,12 +28,16 @@ function Swatch({ hex }: { hex: string }) {
 function EditRow({
   entry,
   palette,
+  swapColours,
+  codeLabel,
   onMerge,
   onSwap,
   onClose,
 }: {
   entry: PaletteEntry;
   palette: PaletteEntry[];
+  swapColours?: Colour[];
+  codeLabel: string;
   onMerge: (into: string) => void;
   onSwap: (to: string) => void;
   onClose: () => void;
@@ -44,22 +52,22 @@ function EditRow({
     if (!q) {
       // Nothing typed: suggest the closest DMC shades to this colour.
       const lab = hexToLab(entry.hex);
-      return [...DMC]
+      return [...(swapColours ?? [])]
         .filter((f) => f.code !== entry.code)
         .map((f) => ({ f, d: deltaE2000Lab(lab, f.lab) }))
         .sort((a, b) => a.d - b.d)
         .slice(0, 8)
         .map((x) => x.f);
     }
-    return DMC.filter((f) => f.code.toLowerCase().startsWith(q) || f.name.toLowerCase().includes(q)).slice(0, 8);
-  }, [query, entry]);
+    return (swapColours ?? []).filter((f) => f.code.toLowerCase().startsWith(q) || f.name.toLowerCase().includes(q)).slice(0, 8);
+  }, [query, entry, swapColours]);
 
   return (
     <div className="grid gap-4 rounded-lg bg-aida p-3 sm:grid-cols-2">
       {others.length > 0 && (
         <div>
           <label htmlFor={`${id}-merge`} className="text-sm font-semibold">
-            Merge DMC {entry.code} into
+            Merge {codeLabel} {entry.code} into
           </label>
           <div className="mt-1 flex gap-2">
             <select
@@ -70,7 +78,7 @@ function EditRow({
             >
               {others.map((c) => (
                 <option key={c.code} value={c.code}>
-                  {c.symbol} DMC {c.code} {c.name}
+                  {c.symbol} {codeLabel} {c.code} {c.name}
                 </option>
               ))}
             </select>
@@ -81,9 +89,10 @@ function EditRow({
           <p className="mt-1 text-xs text-muted">One less colour to buy. Its stitches take the other colour.</p>
         </div>
       )}
+      {swapColours && (
       <div>
         <label htmlFor={`${id}-swap`} className="text-sm font-semibold">
-          Swap for another DMC colour
+          Swap for another {codeLabel} colour
         </label>
         <input
           id={`${id}-swap`}
@@ -108,9 +117,10 @@ function EditRow({
               </button>
             </li>
           ))}
-          {results.length === 0 && <li className="text-sm text-muted">No DMC colour matches that.</li>}
+          {results.length === 0 && <li className="text-sm text-muted">No {codeLabel} colour matches that.</li>}
         </ul>
       </div>
+      )}
       <div className="sm:col-span-2">
         <button onClick={onClose} className="text-sm font-semibold underline underline-offset-2">
           Done
@@ -120,9 +130,12 @@ function EditRow({
   );
 }
 
-export function ColorKey({ palette, fabric, onMerge, onSwap, edited, onReset }: Props) {
+export function ColorKey({ palette, swapColours, codeLabel, countLabel, supply, note, onMerge, onSwap, edited, onReset }: Props) {
   const [editing, setEditing] = useState<string | null>(null);
-  const totalSkeins = palette.reduce((s, c) => s + skeinsNeeded(c.count, fabric), 0);
+  const total = palette.reduce((s, c) => s + c.count, 0);
+  const totalSupply = supply ? palette.reduce((s, c) => s + supply.forCount(c.count), 0) : 0;
+  const lastCol = (count: number) =>
+    supply ? supply.forCount(count).toLocaleString() : `${Math.max(0.1, (count / Math.max(1, total)) * 100).toFixed(1)}%`;
 
   return (
     <div>
@@ -133,10 +146,10 @@ export function ColorKey({ palette, fabric, onMerge, onSwap, edited, onReset }: 
             <tr className="border-b-2 border-charcoal/30">
               <th scope="col" className="py-2 pr-2">Symbol</th>
               <th scope="col" className="py-2 pr-2">Colour</th>
-              <th scope="col" className="py-2 pr-2">DMC</th>
+              <th scope="col" className="py-2 pr-2">{codeLabel}</th>
               <th scope="col" className="py-2 pr-2">Name</th>
-              <th scope="col" className="py-2 pr-2 text-right">Stitches</th>
-              <th scope="col" className="py-2 pr-2 text-right">Skeins</th>
+              <th scope="col" className="py-2 pr-2 text-right">{countLabel}</th>
+              <th scope="col" className="py-2 pr-2 text-right">{supply ? supply.label : "Share"}</th>
               <th scope="col" className="py-2"><span className="sr-only">Edit</span></th>
             </tr>
           </thead>
@@ -145,13 +158,16 @@ export function ColorKey({ palette, fabric, onMerge, onSwap, edited, onReset }: 
               <FragmentRow
                 key={c.code}
                 entry={c}
-                fabric={fabric}
+                last={lastCol(c.count)}
+                codeLabel={codeLabel}
                 open={editing === c.code}
                 onToggle={() => setEditing(editing === c.code ? null : c.code)}
               >
                 <EditRow
                   entry={c}
                   palette={palette}
+                  swapColours={swapColours}
+                  codeLabel={codeLabel}
                   onClose={() => setEditing(null)}
                   onMerge={(into) => {
                     setEditing(null);
@@ -168,18 +184,14 @@ export function ColorKey({ palette, fabric, onMerge, onSwap, edited, onReset }: 
           <tfoot>
             <tr className="font-semibold">
               <td colSpan={4} className="pt-2">{palette.length} colours</td>
-              <td className="pt-2 pr-2 text-right tabular-nums">
-                {palette.reduce((s, c) => s + c.count, 0).toLocaleString()}
-              </td>
-              <td className="pt-2 pr-2 text-right tabular-nums">{totalSkeins}</td>
+              <td className="pt-2 pr-2 text-right tabular-nums">{total.toLocaleString()}</td>
+              <td className="pt-2 pr-2 text-right tabular-nums">{supply ? totalSupply.toLocaleString() : "100%"}</td>
               <td />
             </tr>
           </tfoot>
         </table>
       </div>
-      <p className="mt-3 text-xs text-muted">
-        Skeins assume 2 strands of DMC six-strand floss on {fabric}-count, plus 10% spare. Colours on screen are approximate.
-      </p>
+      <p className="mt-3 text-xs text-muted">{note}</p>
       {edited && (
         <button onClick={onReset} className="mt-2 text-sm font-semibold text-madder underline underline-offset-2">
           Undo all colour changes
@@ -191,13 +203,15 @@ export function ColorKey({ palette, fabric, onMerge, onSwap, edited, onReset }: 
 
 function FragmentRow({
   entry: c,
-  fabric,
+  last,
+  codeLabel,
   open,
   onToggle,
   children,
 }: {
   entry: PaletteEntry;
-  fabric: FabricCount;
+  last: string;
+  codeLabel: string;
   open: boolean;
   onToggle: () => void;
   children: ReactNode;
@@ -210,12 +224,12 @@ function FragmentRow({
         <td className="py-1.5 pr-2 font-semibold">{c.code}</td>
         <td className="py-1.5 pr-2">{c.name}</td>
         <td className="py-1.5 pr-2 text-right tabular-nums">{c.count.toLocaleString()}</td>
-        <td className="py-1.5 pr-2 text-right tabular-nums">{skeinsNeeded(c.count, fabric)}</td>
+        <td className="py-1.5 pr-2 text-right tabular-nums">{last}</td>
         <td className="py-1.5 text-right">
           <button
             onClick={onToggle}
             aria-expanded={open}
-            aria-label={`Change DMC ${c.code} ${c.name}`}
+            aria-label={`Change ${codeLabel} ${c.code} ${c.name}`}
             className="rounded-md border border-dashed border-hoop-dark/60 px-2 py-0.5 text-xs font-semibold hover:bg-aida-deep"
           >
             {open ? "Close" : "Change"}

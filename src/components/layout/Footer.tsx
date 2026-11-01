@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { liveTools } from "@/data/tools";
+import { BUILD_DATE, guideLinks, toolLinks } from "@/lib/publish";
+import { ScheduledLinks } from "@/components/content/ScheduledLinks";
 import { Container } from "./Container";
 import { StitchDivider } from "@/components/content/StitchDivider";
 
@@ -17,15 +18,13 @@ export function Footer() {
       <Container width="tool" className="grid gap-8 pt-6 sm:grid-cols-2">
         <div>
           <h2 className="font-serif text-lg font-bold">All tools</h2>
-          <ul className="mt-2 space-y-1">
-            {liveTools.map((t) => (
-              <li key={t.slug}>
-                <Link href={t.href} className="underline-offset-2 hover:underline">
-                  {t.title}
-                </Link>
-              </li>
-            ))}
-          </ul>
+          <ScheduledLinks items={toolLinks} buildDate={BUILD_DATE} variant="footer" />
+          <ScheduledLinks
+            items={guideLinks}
+            buildDate={BUILD_DATE}
+            variant="footer"
+            heading={{ text: "Guides", level: "h2", className: "mt-6 font-serif text-lg font-bold" }}
+          />
         </div>
         <nav aria-label="Site">
           <h2 className="font-serif text-lg font-bold">PatternPop</h2>

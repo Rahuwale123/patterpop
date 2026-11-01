@@ -69,6 +69,37 @@ The `*.pages.dev` address should not be indexed alongside the real domain: every
 4. SSL is automatic. Under SSL/TLS set the mode to **Full** and turn on **Always Use HTTPS**.
 5. Add the site to Google Search Console and submit `https://patternpop.online/sitemap.xml`.
 
+## Publishing schedule (no rebuilds needed)
+
+Every tool and guide has a `publishDate` (UTC) in `src/data/tools.ts` and `src/data/guides.ts`. All pages
+are built and deployed at once; the edge code in `functions/_middleware.js` decides at request time:
+
+- before its `publishDate`, a page (and its `.txt` / navigation data) answers **404** with the normal 404 page
+- `/sitemap.xml` is generated at the edge, listing only live pages, with `lastmod` = `updated` or `publishDate`
+- footer and related-tool links list the pages live at deploy time, and a small script adds pages that
+  went live since (`ScheduledLinks`), so nothing needs a rebuild on publish day
+
+To add a page later: create it, add an entry with its `publishDate` to `tools.ts` or `guides.ts`, deploy once.
+To change a page, set `updated` to the date so the sitemap tells search engines.
+
+Preview a future date locally:
+
+```bash
+npm run build
+npx wrangler pages dev out --binding PATTERNPOP_TODAY=2026-12-31   # http://localhost:8788
+```
+
+## Deploying an update
+
+The site is a Cloudflare Pages **direct upload** project named `patternpop` (pushing to GitHub does not deploy).
+
+```bash
+npm run build
+npx wrangler pages deploy out --project-name patternpop --branch main
+```
+
+Log in once with `npx wrangler login`, or set `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
+
 ## Before launch
 
 - Long copy is marked `{/* DRAFT: human review */}`; rewrite it in your own voice whenever you like.

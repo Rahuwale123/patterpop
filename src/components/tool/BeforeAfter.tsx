@@ -38,7 +38,11 @@ export function BeforeAfter({ photo, pattern, maxHeight = 340 }: { photo: Source
     <figure className="m-0">
       <div
         className="relative mx-auto overflow-hidden rounded-lg"
-        style={{ aspectRatio: `${pattern.width} / ${pattern.height}`, maxHeight, maxWidth: (maxHeight * pattern.width) / pattern.height }}
+        style={{
+          aspectRatio: `${pattern.width} / ${pattern.height * (pattern.cellAspect ?? 1)}`,
+          maxHeight,
+          maxWidth: (maxHeight * pattern.width) / (pattern.height * (pattern.cellAspect ?? 1)),
+        }}
       >
         <canvas ref={patternRef} aria-hidden="true" className="absolute inset-0 h-full w-full [image-rendering:pixelated]" />
         <canvas

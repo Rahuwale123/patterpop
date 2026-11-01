@@ -280,7 +280,7 @@ export default function HomePage() {
 
       <Faq items={homeFaqs} heading="Cross stitch pattern maker FAQ" />
 
-      <RelatedTools currentSlug="cross-stitch-pattern-maker" />
+      <RelatedTools current="/" />
     </>
   );
 }

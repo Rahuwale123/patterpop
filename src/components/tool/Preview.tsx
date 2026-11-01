@@ -3,7 +3,7 @@
 import clsx from "clsx";
 import { useEffect, useRef, useState, type PointerEvent } from "react";
 import type { Pattern } from "@/lib/pattern/pipeline";
-import { drawChart, drawRealistic, type View } from "@/lib/pattern/render";
+import { drawChart, drawRealistic, type StitchStyle, type View } from "@/lib/pattern/render";
 
 // Zoom levels for the − / + buttons, in screen pixels per stitch. Pinching can land anywhere between.
 const ZOOMS = [3, 4, 6, 8, 10, 12, 16, 20, 24] as const;
@@ -18,6 +18,8 @@ type Props = {
   initialZoom?: number;
   height?: number;
   label: string;
+  /** Realistic look when zoomed in: cross stitch, beads, drills, crochet or knitting */
+  style?: StitchStyle;
 };
 
 type Pinch = {
@@ -33,7 +35,7 @@ type Pinch = {
 const dist = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.hypot(a.x - b.x, a.y - b.y);
 const midpoint = (a: { x: number; y: number }, b: { x: number; y: number }) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
 
-export function Preview({ pattern, initialView = "realistic", initialZoom, height = 480, label }: Props) {
+export function Preview({ pattern, initialView = "realistic", initialZoom, height = 480, label, style = "cross" }: Props) {
   const [view, setView] = useState<View>(initialView);
   // null = fit the whole pattern in the box
   const [zoom, setZoom] = useState<number | null>(initialZoom === undefined ? null : ZOOMS[initialZoom]);
@@ -44,13 +46,15 @@ export function Preview({ pattern, initialView = "realistic", initialZoom, heigh
   const pinch = useRef<Pinch | null>(null);
   // Latest zoom values for the native touch listeners, which are attached once.
   const zoomRef = useRef({ cell: 0, maxCell: 0, minCell: 1 });
+  const pinchAspect = useRef(1);
   // After a pinch, the scroll position to restore once the canvas is redrawn at the new size
   const pendingScroll = useRef<{ left: number; top: number } | null>(null);
 
   // Chart symbols need room; bump small zooms up when on the chart tab.
-  const maxCell = Math.min(MAX_CELL, Math.floor(MAX_CANVAS_SIDE / Math.max(pattern.width, pattern.height)));
+  const asp = pattern.cellAspect ?? 1;
+  const maxCell = Math.min(MAX_CELL, Math.floor(MAX_CANVAS_SIDE / Math.max(pattern.width, pattern.height * asp)));
   const fitCell = boxW
-    ? Math.max(1, Math.floor(Math.min((boxW - 2) / pattern.width, (height - 2) / pattern.height) * 4) / 4)
+    ? Math.max(1, Math.floor(Math.min((boxW - 2) / pattern.width, (height - 2) / (pattern.height * asp)) * 4) / 4)
     : ZOOMS[2];
   const minCell = Math.min(MIN_CELL, fitCell);
   const base = zoom ?? fitCell;
@@ -68,24 +72,25 @@ export function Preview({ pattern, initialView = "realistic", initialZoom, heigh
     const canvas = canvasRef.current;
     if (!canvas) return;
     const dpr = Math.min(2, window.devicePixelRatio || 1);
-    const scale = Math.min(dpr, MAX_CANVAS_SIDE / (Math.max(pattern.width, pattern.height) * cell));
+    const a = pattern.cellAspect ?? 1;
+    const scale = Math.min(dpr, MAX_CANVAS_SIDE / (Math.max(pattern.width, pattern.height * a) * cell));
     canvas.width = Math.round(pattern.width * cell * scale);
-    canvas.height = Math.round(pattern.height * cell * scale);
+    canvas.height = Math.round(pattern.height * a * cell * scale);
     canvas.style.width = `${pattern.width * cell}px`;
-    canvas.style.height = `${pattern.height * cell}px`;
+    canvas.style.height = `${pattern.height * a * cell}px`;
     canvas.style.transform = "";
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     ctx.setTransform(scale, 0, 0, scale, 0, 0);
     if (view === "chart") drawChart(ctx, pattern, cell);
-    else drawRealistic(ctx, pattern, cell);
+    else drawRealistic(ctx, pattern, cell, style);
     const ps = pendingScroll.current;
     if (ps && scrollRef.current) {
       scrollRef.current.scrollLeft = ps.left;
       scrollRef.current.scrollTop = ps.top;
       pendingScroll.current = null;
     }
-  }, [pattern, view, cell]);
+  }, [pattern, view, cell, style]);
 
   const stepZoom = (dir: 1 | -1) => {
     const next = dir > 0 ? ZOOMS.find((z) => z > cell) : [...ZOOMS].reverse().find((z) => z < cell);
@@ -94,7 +99,8 @@ export function Preview({ pattern, initialView = "realistic", initialZoom, heigh
 
   useEffect(() => {
     zoomRef.current = { cell, maxCell, minCell };
-  }, [cell, maxCell, minCell]);
+    pinchAspect.current = pattern.cellAspect ?? 1;
+  }, [cell, maxCell, minCell, pattern]);
 
   // Two-finger pinch and pan. Native listeners, because only they may call
   // preventDefault to stop the browser zooming the page. One finger is left
@@ -115,7 +121,7 @@ export function Preview({ pattern, initialView = "realistic", initialZoom, heigh
       pinch.current = {
         d0: Math.max(1, dist(a, b)),
         mid0,
-        anchor: { x: (mid0.x - r.left) / c, y: (mid0.y - r.top) / c },
+        anchor: { x: (mid0.x - r.left) / c, y: (mid0.y - r.top) / (c * (pinchAspect.current || 1)) },
         cell0: c,
         scale: 1,
         mid: mid0,
@@ -145,7 +151,7 @@ export function Preview({ pattern, initialView = "realistic", initialZoom, heigh
       // Keep the stitch that was under the fingers under their final midpoint.
       const target = {
         left: Math.max(0, p.anchor.x * next - (p.mid.x - r.left)),
-        top: Math.max(0, p.anchor.y * next - (p.mid.y - r.top)),
+        top: Math.max(0, p.anchor.y * next * (pinchAspect.current || 1) - (p.mid.y - r.top)),
       };
       if (canvasRef.current) canvasRef.current.style.transform = "";
       if (next === c) {

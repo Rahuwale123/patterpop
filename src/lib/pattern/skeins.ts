@@ -9,16 +9,18 @@ import type { FabricCount } from "./fabric";
 //   the back: about (2 * sqrt(2) + 2) = 4.83 stitch-widths of thread.
 // - About 50% extra goes on tails, starting/ending and travelling between
 //   areas, which is what stitchers' real-world counts suggest.
-const THREAD_PER_SKEIN_CM = 800 * 3; // 8 m, split into 3 two-strand lengths
+const THREAD_PER_SKEIN_CM = 800 * 3; // 8 m of 6 strands = 3 two-strand lengths
 const THREAD_PER_STITCH_WIDTHS = 2 * Math.SQRT2 + 2;
 const WASTE_FACTOR = 1.5;
 
 /** Extra 10% so you don't run out on the last row. */
 export const SKEIN_SAFETY_MARGIN = 0.1;
 
-function stitchesPerSkein(count: FabricCount): number {
+/** Full crosses one skein covers. More strands use the skein up faster (2 strands is the usual). */
+export function stitchesPerSkein(count: number, strands = 2): number {
   const stitchWidthCm = 2.54 / count;
-  return Math.floor(THREAD_PER_SKEIN_CM / (THREAD_PER_STITCH_WIDTHS * stitchWidthCm * WASTE_FACTOR));
+  const threadCm = THREAD_PER_SKEIN_CM * (2 / strands);
+  return Math.floor(threadCm / (THREAD_PER_STITCH_WIDTHS * stitchWidthCm * WASTE_FACTOR));
 }
 
 /** Full cross stitches one skein covers, 2 strands, per fabric count. */
@@ -29,7 +31,7 @@ export const STITCHES_PER_SKEIN: Record<FabricCount, number> = {
   18: stitchesPerSkein(18), // ≈ 2,340
 };
 
-export function skeinsNeeded(stitches: number, count: FabricCount): number {
+export function skeinsNeeded(stitches: number, count: number, strands = 2): number {
   if (stitches <= 0) return 0;
-  return Math.ceil((stitches * (1 + SKEIN_SAFETY_MARGIN)) / STITCHES_PER_SKEIN[count]);
+  return Math.ceil((stitches * (1 + SKEIN_SAFETY_MARGIN)) / stitchesPerSkein(count, strands));
 }

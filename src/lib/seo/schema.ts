@@ -54,3 +54,28 @@ export function organization() {
     email: site.contactEmail,
   };
 }
+
+export function article(a: { title: string; description: string; path: string; published: string; modified: string }) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    headline: a.title,
+    description: a.description,
+    mainEntityOfPage: absoluteUrl(a.path),
+    datePublished: a.published,
+    dateModified: a.modified,
+    image: absoluteUrl(site.defaultOgImage),
+    author: { "@type": "Organization", name: site.name, url: site.url },
+    publisher: { "@type": "Organization", name: site.name, url: site.url, logo: { "@type": "ImageObject", url: absoluteUrl("/icon.png") } },
+  };
+}
+
+export function howTo(name: string, description: string, steps: { name: string; text: string }[]) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "HowTo",
+    name,
+    description,
+    step: steps.map((s, i) => ({ "@type": "HowToStep", position: i + 1, name: s.name, text: s.text })),
+  };
+}

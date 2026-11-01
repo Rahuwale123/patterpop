@@ -1,18 +1,12 @@
 import { EMPTY } from "@/lib/color/cleanup";
-import { DMC } from "./dmc";
+import { findColour, type PaletteId } from "./palettes";
 import type { Pattern } from "./pipeline";
 
 /**
- * Colour key edits are stored as operations by DMC code, so they can be
+ * Colour key edits are stored as operations by colour code, so they can be
  * re-applied after the pattern is regenerated with new settings.
  */
 export type ColourEdit = { type: "merge"; from: string; into: string } | { type: "swap"; from: string; to: string };
-
-const byCode = new Map(DMC.map((f) => [f.code, f]));
-
-export function findFloss(code: string) {
-  return byCode.get(code);
-}
 
 function mergeInto(p: Pattern, fromIdx: number, intoIdx: number): Pattern {
   const palette = p.palette.map((c) => ({ ...c }));
@@ -27,7 +21,7 @@ function mergeInto(p: Pattern, fromIdx: number, intoIdx: number): Pattern {
   return { ...p, cells, palette };
 }
 
-export function applyEdit(p: Pattern, e: ColourEdit): Pattern {
+export function applyEdit(p: Pattern, e: ColourEdit, paletteId: PaletteId = "dmc"): Pattern {
   const fromIdx = p.palette.findIndex((c) => c.code === e.from);
   if (fromIdx < 0) return p; // colour no longer in the pattern
   if (e.type === "merge") {
@@ -36,12 +30,12 @@ export function applyEdit(p: Pattern, e: ColourEdit): Pattern {
   }
   const existing = p.palette.findIndex((c) => c.code === e.to);
   if (existing >= 0) return existing === fromIdx ? p : mergeInto(p, fromIdx, existing);
-  const floss = findFloss(e.to);
-  if (!floss) return p;
-  const palette = p.palette.map((c, i) => (i === fromIdx ? { ...c, code: floss.code, name: floss.name, hex: floss.hex } : c));
+  const colour = findColour(paletteId, e.to);
+  if (!colour) return p;
+  const palette = p.palette.map((c, i) => (i === fromIdx ? { ...c, code: colour.code, name: colour.name, hex: colour.hex } : c));
   return { ...p, palette };
 }
 
-export function applyEdits(p: Pattern, edits: ColourEdit[]): Pattern {
-  return edits.reduce(applyEdit, p);
+export function applyEdits(p: Pattern, edits: ColourEdit[], paletteId: PaletteId = "dmc"): Pattern {
+  return edits.reduce((acc, e) => applyEdit(acc, e, paletteId), p);
 }

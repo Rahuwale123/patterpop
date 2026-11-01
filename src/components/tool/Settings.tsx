@@ -1,21 +1,21 @@
 "use client";
 
 import clsx from "clsx";
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { MAX_WIDTH, MIN_WIDTH } from "@/lib/pattern/grid";
 import type { PatternSettings } from "@/lib/pattern/pipeline";
 import { SKIN_WARMTH_MAX, SKIN_WARMTH_MIN } from "@/lib/color/whitebalance";
-import { CM_PER_INCH, FABRIC_COUNTS, type FabricCount } from "@/lib/pattern/fabric";
+import { CM_PER_INCH } from "@/lib/pattern/fabric";
 
 export const MIN_COLOURS = 5;
 // TODO(pro): a Pro licence key could lift these limits (wider than MAX_WIDTH, more than 40 colours).
 export const MAX_COLOURS = 40;
 
-const DETAIL_PRESETS = [
+const DEFAULT_PRESETS = [
   { label: "Simple", width: 60 },
   { label: "Detailed", width: 100 },
   { label: "Very detailed", width: 150 },
-] as const;
+];
 
 type SizeMode = "stitches" | "size";
 type Unit = "in" | "cm";
@@ -23,11 +23,19 @@ type Unit = "in" | "cm";
 type Props = {
   value: PatternSettings;
   onChange: (next: PatternSettings) => void;
-  /** Leave out fabric to hide fabric count and the finished-size mode (e.g. on the dev compare page). */
-  fabric?: FabricCount;
-  onFabricChange?: (f: FabricCount) => void;
-  /** Height / width of the cropped photo, to show the height in stitches */
+  /** Cells per inch across (fabric count, bead size or yarn gauge). Leave out to hide the finished-size mode. */
+  unitsPerInch?: number;
+  /** Rows per inch, when cells aren't square (knitting) */
+  rowsPerInch?: number;
+  /** What a cell is called, e.g. "stitches" or "beads" */
+  unitWord?: string;
+  /** Height / width of the cropped photo in cells, to show the height */
   aspect?: number;
+  widthRange?: { min: number; max: number };
+  maxColours?: number;
+  presets?: { label: string; width: number }[];
+  /** Craft-specific size inputs (fabric count, gauge) */
+  sizeControls?: ReactNode;
 };
 
 function Range(props: {
@@ -94,9 +102,18 @@ function Segmented<T extends string>(props: { label: string; value: T; options: 
   );
 }
 
-const clampWidth = (w: number) => Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, Math.round(w)));
-
-export function Settings({ value, onChange, fabric, onFabricChange, aspect }: Props) {
+export function Settings({
+  value,
+  onChange,
+  unitsPerInch: fabric,
+  rowsPerInch,
+  unitWord = "stitches",
+  aspect,
+  widthRange = { min: MIN_WIDTH, max: MAX_WIDTH },
+  maxColours = MAX_COLOURS,
+  presets = DEFAULT_PRESETS,
+  sizeControls,
+}: Props) {
   const set = <K extends keyof PatternSettings>(k: K, v: PatternSettings[K]) => onChange({ ...value, [k]: v });
   const [mode, setMode] = useState<SizeMode>("stitches");
   const [unit, setUnit] = useState<Unit>("in");
@@ -108,16 +125,21 @@ export function Settings({ value, onChange, fabric, onFabricChange, aspect }: Pr
   const typedInches = toInches(Number(sizeText), unit);
   const wanted = fabric && typedInches > 0 ? Math.round(typedInches * fabric) : undefined;
 
-  const applySize = (text: string, u: Unit, f: FabricCount) => {
-    const inches = toInches(Number(text), u);
-    if (inches > 0) set("width", clampWidth(inches * f));
-  };
+  const applySize = useCallback(
+    (text: string, u: Unit, f: number) => {
+      const inches = u === "in" ? Number(text) : Number(text) / CM_PER_INCH;
+      if (inches > 0) onChange({ ...value, width: Math.min(widthRange.max, Math.max(widthRange.min, Math.round(inches * f))) });
+    },
+    [onChange, value, widthRange.min, widthRange.max],
+  );;
 
-  const changeFabric = (f: FabricCount) => {
-    onFabricChange?.(f);
-    // In "By finished size", keep the size and change the stitch count instead.
-    if (mode === "size") applySize(sizeText, unit, f);
-  };
+  // In "By finished size", a new fabric count or gauge keeps the size and changes the count instead.
+  const lastPerInch = useRef(fabric);
+  useEffect(() => {
+    if (fabric === lastPerInch.current) return;
+    lastPerInch.current = fabric;
+    if (mode === "size" && fabric) applySize(sizeText, unit, fabric);
+  }, [fabric, mode, sizeText, unit, applySize]);
 
   const fmt = (n: number) => n.toFixed(1);
 
@@ -145,14 +167,14 @@ export function Settings({ value, onChange, fabric, onFabricChange, aspect }: Pr
           <Range
             id="set-width"
             label="Width"
-            min={MIN_WIDTH}
-            max={MAX_WIDTH}
+            min={widthRange.min}
+            max={widthRange.max}
             value={value.width}
-            suffix="stitches"
+            suffix={unitWord}
             onChange={(v) => set("width", v)}
           />
           <div className="mt-2 flex flex-wrap gap-1.5" role="group" aria-label="Detail presets">
-            {DETAIL_PRESETS.map((p) => (
+            {presets.map((p) => (
               <button
                 key={p.width}
                 type="button"
@@ -205,45 +227,23 @@ export function Settings({ value, onChange, fabric, onFabricChange, aspect }: Pr
           </div>
           {wanted !== undefined && wanted !== value.width && (
             <p className="mt-1 text-xs text-madder">
-              That needs {wanted} stitches; the tool allows {MIN_WIDTH}–{MAX_WIDTH}. Try a {wanted > MAX_WIDTH ? "higher" : "lower"} fabric count.
+              That needs {wanted} {unitWord}; the tool allows {widthRange.min}–{widthRange.max}. Try a smaller or larger size.
             </p>
           )}
         </div>
       )}
 
-      {fabric && onFabricChange && (
-        <div>
-          <label htmlFor="set-fabric" className="text-sm font-semibold">
-            Fabric count (stitches per inch)
-          </label>
-          <select
-            id="set-fabric"
-            value={fabric}
-            onChange={(e) => changeFabric(Number(e.currentTarget.value) as FabricCount)}
-            aria-describedby="set-fabric-help"
-            className="mt-1 w-full rounded-md border border-charcoal/30 bg-linen px-2 py-1.5"
-          >
-            {FABRIC_COUNTS.map((c) => (
-              <option key={c} value={c}>
-                {c}-count Aida
-              </option>
-            ))}
-          </select>
-          <p id="set-fabric-help" className="mt-1 text-xs text-muted">
-            Changes the finished size, not the detail.
-          </p>
-        </div>
-      )}
+      {sizeControls}
 
       {fabric && (
         <p className="rounded-md bg-aida px-2 py-1.5 text-sm" aria-live="polite">
           <strong>
             {value.width}
-            {heightStitches ? ` × ${heightStitches}` : ""} stitches
+            {heightStitches ? ` × ${heightStitches}` : ""} {unitWord}
           </strong>{" "}
           = {fmt(value.width / fabric)}
-          {heightStitches ? ` × ${fmt(heightStitches / fabric)}` : ""} in ({fmt((value.width / fabric) * CM_PER_INCH)}
-          {heightStitches ? ` × ${fmt((heightStitches / fabric) * CM_PER_INCH)}` : ""} cm)
+          {heightStitches ? ` × ${fmt(heightStitches / (rowsPerInch ?? fabric))}` : ""} in ({fmt((value.width / fabric) * CM_PER_INCH)}
+          {heightStitches ? ` × ${fmt((heightStitches / (rowsPerInch ?? fabric)) * CM_PER_INCH)}` : ""} cm)
         </p>
       )}
 
@@ -251,7 +251,7 @@ export function Settings({ value, onChange, fabric, onFabricChange, aspect }: Pr
         id="set-colours"
         label="Colours"
         min={MIN_COLOURS}
-        max={MAX_COLOURS}
+        max={maxColours}
         value={value.maxColours}
         suffix="max"
         onChange={(v) => set("maxColours", v)}

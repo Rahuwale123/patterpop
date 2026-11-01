@@ -2,10 +2,9 @@
 
 import clsx from "clsx";
 import { useState } from "react";
-import type { FabricCount } from "@/lib/pattern/fabric";
 import type { Pattern } from "@/lib/pattern/pipeline";
 import { downloadBlob, patternFilename } from "@/lib/pattern/download";
-import type { Paper } from "@/lib/pdf/buildPdf";
+import type { Paper, PdfOptions } from "@/lib/pdf/buildPdf";
 
 export function defaultPaper(): Paper {
   const lang = typeof navigator === "undefined" ? "" : navigator.language;
@@ -14,13 +13,16 @@ export function defaultPaper(): Paper {
 
 type Props = {
   pattern: Pattern;
-  fabric: FabricCount;
+  /** Craft-specific PDF wording and supplies (paper is chosen here) */
+  pdf: Omit<PdfOptions, "paper">;
+  /** Used in the download file name, e.g. "perler-bead-pattern" */
+  fileKind?: string;
   /** Kept by the parent so the choice survives starting a new photo */
   paper: Paper;
   onPaperChange: (p: Paper) => void;
 };
 
-export function ExportPanel({ pattern, fabric, paper, onPaperChange: setPaper }: Props) {
+export function ExportPanel({ pattern, pdf, paper, onPaperChange: setPaper, fileKind = "cross-stitch" }: Props) {
   const [busy, setBusy] = useState<"pdf" | "png" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -31,10 +33,10 @@ export function ExportPanel({ pattern, fabric, paper, onPaperChange: setPaper }:
       // TODO(pro): gate larger grids (>150 wide, >40 colours) and watermark-free PDFs behind a licence-key check here.
       if (kind === "pdf") {
         const { buildPdf } = await import("@/lib/pdf/buildPdf");
-        downloadBlob(await buildPdf(pattern, { paper, fabric }), patternFilename(pattern.width, pattern.height, "pdf"));
+        downloadBlob(await buildPdf(pattern, { ...pdf, paper }), patternFilename(fileKind, pattern.width, pattern.height, "pdf"));
       } else {
         const { buildChartPng } = await import("@/lib/pattern/png");
-        downloadBlob(await buildChartPng(pattern), patternFilename(pattern.width, pattern.height, "png"));
+        downloadBlob(await buildChartPng(pattern), patternFilename(fileKind, pattern.width, pattern.height, "png"));
       }
     } catch {
       setError("Sorry, the download didn't work. Please try again.");

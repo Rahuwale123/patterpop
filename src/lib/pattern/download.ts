@@ -9,6 +9,6 @@ export function downloadBlob(blob: Blob, filename: string): void {
   setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
 
-export function patternFilename(width: number, height: number, ext: string): string {
-  return `patternpop-cross-stitch-${width}x${height}.${ext}`;
+export function patternFilename(kind: string, width: number, height: number, ext: string): string {
+  return `patternpop-${kind}-${width}x${height}.${ext}`;
 }

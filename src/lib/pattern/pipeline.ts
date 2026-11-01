@@ -2,9 +2,9 @@ import { deltaE2000, nearestIndex } from "@/lib/color/ciede2000";
 import { kmeans } from "@/lib/color/kmeans";
 import { ditherLab } from "@/lib/color/dither";
 import { clearLightBackground, EMPTY, removeStrayStitches } from "@/lib/color/cleanup";
-import { isSkinLike, isSkinSafeThread } from "@/lib/color/skin";
+import { isSkinLike } from "@/lib/color/skin";
 import { correctPortrait } from "@/lib/color/whitebalance";
-import { DMC, DMC_LAB } from "./dmc";
+import { addColour, brandPalette, freePalette, type Palette, type PaletteId } from "./palettes";
 import { gridHeight, resampleToLab } from "./grid";
 import { assignSymbols } from "./symbols";
 
@@ -20,6 +20,10 @@ export type PatternSettings = {
   skinWarmth: number;
   /** Give the outer area only a few threads, so more colours go to the subject. */
   simplifyBackground: boolean;
+  /** Colours to match to: DMC floss, Perler beads, or the photo's own colours (yarn) */
+  palette: PaletteId;
+  /** Height / width of one stitch. 1 for square cells; knitted stitches are wider than tall. */
+  cellAspect: number;
   seed: number;
 };
 
@@ -32,6 +36,8 @@ export const DEFAULT_SETTINGS: PatternSettings = {
   portrait: false,
   skinWarmth: 0,
   simplifyBackground: false,
+  palette: "dmc",
+  cellAspect: 1,
   seed: 1,
 };
 
@@ -51,6 +57,8 @@ export type Pattern = {
   palette: PaletteEntry[];
   /** Lots of skin tones in the middle of the design, so probably a face */
   faceLikely?: boolean;
+  /** Height / width of one cell, when not square */
+  cellAspect?: number;
 };
 
 // "Leave white background unstitched" treats very light, nearly neutral floss as background.
@@ -102,8 +110,6 @@ function gather(lab: Float32Array, idx: number[]): Float32Array {
   return out;
 }
 
-/** DMC threads that skin-like colours may map to. */
-const SKIN_SAFE_DMC = Uint8Array.from(DMC, (f) => (isSkinSafeThread(f.lab[0], f.lab[1], f.lab[2]) ? 1 : 0));
 
 function centreWeights(width: number, height: number): Float32Array {
   const w = new Float32Array(width * height);
@@ -122,19 +128,26 @@ function and(a: Uint8Array, b: Uint8Array): Uint8Array {
   return a.map((v, i) => v & b[i]);
 }
 
-/** Nearest DMC to a colour, keeping skin on warm threads and optionally skipping threads already used. */
-function matchDmc(L: number, a: number, b: number, portrait: boolean, exclude?: Uint8Array): number {
-  let allowed: Uint8Array | undefined = isSkinLike(L, a, b, portrait) ? SKIN_SAFE_DMC : undefined;
+/**
+ * Nearest palette colour, keeping skin on warm colours and optionally skipping
+ * colours already used. A free palette has no fixed colours: it adds this one.
+ */
+function matchColour(pal: Palette, L: number, a: number, b: number, portrait: boolean, exclude?: Uint8Array): number {
+  if (pal.id === "free") return addColour(pal, L, a, b);
+  let allowed: Uint8Array | undefined = isSkinLike(L, a, b, portrait) ? pal.skinSafe : undefined;
   if (exclude) {
     const free = exclude.map((v) => 1 - v);
     allowed = allowed ? and(allowed, free) : free;
   }
-  return nearestIndex(L, a, b, DMC_LAB, allowed);
+  return nearestIndex(L, a, b, pal.lab, allowed);
 }
 
 export function buildPattern(rgba: Uint8ClampedArray, srcW: number, srcH: number, s: PatternSettings): Pattern {
   const width = s.width;
-  const height = gridHeight(width, srcW, srcH);
+  const cellAspect = s.cellAspect || 1;
+  const height = gridHeight(width, srcW, srcH, cellAspect);
+  const pal = s.palette === "free" ? freePalette() : brandPalette(s.palette);
+  const DMC = pal.colours;
   const n = width * height;
   const portrait = s.portrait;
 
@@ -148,7 +161,7 @@ export function buildPattern(rgba: Uint8ClampedArray, srcW: number, srcH: number
   // (clusters that land on the same thread merge). With "Simplify background"
   // the outer area is clustered on its own into a few threads.
   const toDmc = (c: Float64Array) =>
-    Array.from({ length: c.length / 3 }, (_, j) => matchDmc(c[j * 3], c[j * 3 + 1], c[j * 3 + 2], portrait));
+    Array.from({ length: c.length / 3 }, (_, j) => matchColour(pal, c[j * 3], c[j * 3 + 1], c[j * 3 + 2], portrait));
   // `inner` ends up 1 for subject stitches and 0 for background ones.
   const inner = s.simplifyBackground ? subjectMask(width, height) : undefined;
   let centreDmc: number[];
@@ -178,7 +191,7 @@ export function buildPattern(rgba: Uint8ClampedArray, srcW: number, srcH: number
   const bestD = new Float64Array(n);
   const skinStitch = Uint8Array.from({ length: n }, (_, i) => (isSkinLike(lab[i * 3], lab[i * 3 + 1], lab[i * 3 + 2], portrait) ? 1 : 0));
   const tryThread = (i: number, t: number): boolean => {
-    if (skinStitch[i] && !SKIN_SAFE_DMC[threads[t]]) return false;
+    if (skinStitch[i] && !pal.skinSafe[threads[t]]) return false;
     if (inner && bgThreads && !inner[i] && !bgThreads.has(threads[t])) return false;
     const f = DMC[threads[t]].lab;
     const d = deltaE2000(lab[i * 3], lab[i * 3 + 1], lab[i * 3 + 2], f[0], f[1], f[2]);
@@ -224,9 +237,9 @@ export function buildPattern(rgba: Uint8ClampedArray, srcW: number, srcH: number
       // The half further from the current thread gets a new one.
       const cur = DMC[threads[target]].lab;
       const far = deltaE2000(c[3], c[4], c[5], cur[0], cur[1], cur[2]) > deltaE2000(c[0], c[1], c[2], cur[0], cur[1], cur[2]) ? 1 : 0;
-      const taken = new Uint8Array(DMC.length);
+      const taken = new Uint8Array(pal.colours.length + 1);
       for (const t of threads) taken[t] = 1;
-      const fresh = matchDmc(c[far * 3], c[far * 3 + 1], c[far * 3 + 2], portrait, taken);
+      const fresh = matchColour(pal, c[far * 3], c[far * 3 + 1], c[far * 3 + 2], portrait, taken);
       if (taken[fresh]) {
         unsplittable.add(target);
         continue;
@@ -268,7 +281,7 @@ export function buildPattern(rgba: Uint8ClampedArray, srcW: number, srcH: number
     const fixed = s.skipWhiteBackground ? clearLightBackground(cells, width, height, isLightThread, isFringe) : cells;
     const skip = Uint8Array.from(fixed, (v, i) => (v === EMPTY || (inner && !inner[i]) ? 1 : 0));
     const paletteLab = Float64Array.from(dmcIdx.flatMap((d) => DMC[d].lab));
-    const paletteSkinSafe = Uint8Array.from(dmcIdx, (d) => SKIN_SAFE_DMC[d]);
+    const paletteSkinSafe = Uint8Array.from(dmcIdx, (d) => pal.skinSafe[d]);
     out = ditherLab(lab, width, height, paletteLab, {
       skip,
       fixed,
@@ -291,7 +304,11 @@ export function buildPattern(rgba: Uint8ClampedArray, srcW: number, srcH: number
     out = clearLightBackground(out, width, height, isLightThread, isFringe);
   }
 
-  return { ...compactPalette(out, dmcIdx, width, height), faceLikely: centreSkinShare(raw, width, height) >= FACE_SKIN_SHARE };
+  return {
+    ...compactPalette(out, dmcIdx, width, height, pal),
+    faceLikely: centreSkinShare(raw, width, height) >= FACE_SKIN_SHARE,
+    cellAspect,
+  };
 }
 
 function centreSkinShare(lab: Float32Array, width: number, height: number): number {
@@ -308,7 +325,7 @@ function centreSkinShare(lab: Float32Array, width: number, height: number): numb
 }
 
 /** Drop unused colours, sort by stitch count, and give each a unique symbol. */
-function compactPalette(cells: Int16Array, dmcIdx: number[], width: number, height: number): Pattern {
+function compactPalette(cells: Int16Array, dmcIdx: number[], width: number, height: number, pal: Palette): Pattern {
   const counts = new Array<number>(dmcIdx.length).fill(0);
   for (const c of cells) if (c !== EMPTY) counts[c]++;
   const order = dmcIdx.map((_, i) => i).filter((i) => counts[i] > 0).sort((a, b) => counts[b] - counts[a]);
@@ -317,8 +334,10 @@ function compactPalette(cells: Int16Array, dmcIdx: number[], width: number, heig
   const out = cells.map((c) => (c === EMPTY ? EMPTY : remap[c]));
   const symbols = assignSymbols(order.length);
   const palette = order.map((old, i) => {
-    const f = DMC[dmcIdx[old]];
-    return { code: f.code, name: f.name, hex: f.hex, symbol: symbols[i], count: counts[old] };
+    const f = pal.colours[dmcIdx[old]];
+    // Free colours are renumbered 1..n in order of use
+    const code = pal.id === "free" ? String(i + 1) : f.code;
+    return { code, name: f.name, hex: f.hex, symbol: symbols[i], count: counts[old] };
   });
   return { width, height, cells: out, palette };
 }

@@ -122,8 +122,12 @@ export default function AboutPage() {
             <a href="https://creativecommons.org/licenses/by/4.0/" rel="nofollow noopener" className="underline">
               CC BY 4.0
             </a>{" "}
-            (DMC codes, names and hex values, unchanged). DMC is a trademark of DMC. PatternPop is an independent
-            tool and isn&apos;t affiliated with DMC.
+            (DMC codes, names and hex values, unchanged). Perler bead colours from the same project, based on{" "}
+            <a href="https://github.com/maxcleme/beadcolors" rel="nofollow noopener" className="underline">
+              maxcleme/beadcolors
+            </a>{" "}
+            (MIT licence). DMC is a trademark of DMC; Perler is a trademark of its owner. PatternPop is an independent
+            tool and isn&apos;t affiliated with either.
           </p>
         </Container>
       </div>

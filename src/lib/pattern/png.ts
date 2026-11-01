@@ -1,4 +1,4 @@
-import { drawChart } from "./render";
+import { cellHeight, drawChart } from "./render";
 import type { Pattern } from "./pipeline";
 
 const CELL = 16;
@@ -8,7 +8,8 @@ const MARGIN = 32;
 export async function buildChartPng(p: Pattern): Promise<Blob> {
   const canvas = document.createElement("canvas");
   canvas.width = p.width * CELL + MARGIN * 2;
-  canvas.height = p.height * CELL + MARGIN * 2;
+  const CH = cellHeight(p, CELL);
+  canvas.height = Math.round(p.height * CH) + MARGIN * 2;
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("Canvas 2D is not available");
   ctx.fillStyle = "#ffffff";
@@ -24,11 +25,11 @@ export async function buildChartPng(p: Pattern): Promise<Blob> {
   ctx.textBaseline = "middle";
   for (let x = 10; x <= p.width; x += 10) {
     ctx.fillText(String(x), MARGIN + x * CELL, MARGIN / 2);
-    ctx.fillText(String(x), MARGIN + x * CELL, MARGIN * 1.5 + p.height * CELL);
+    ctx.fillText(String(x), MARGIN + x * CELL, MARGIN * 1.5 + p.height * CH);
   }
   for (let y = 10; y <= p.height; y += 10) {
-    ctx.fillText(String(y), MARGIN / 2, MARGIN + y * CELL);
-    ctx.fillText(String(y), MARGIN * 1.5 + p.width * CELL, MARGIN + y * CELL);
+    ctx.fillText(String(y), MARGIN / 2, MARGIN + y * CH);
+    ctx.fillText(String(y), MARGIN * 1.5 + p.width * CELL, MARGIN + y * CH);
   }
   return new Promise((resolve, reject) =>
     canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Could not create the PNG"))), "image/png"),

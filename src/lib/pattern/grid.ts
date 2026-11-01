@@ -3,8 +3,9 @@ import { linearRgbToLab, srgbToLinear } from "@/lib/color/lab";
 export const MIN_WIDTH = 30;
 export const MAX_WIDTH = 150;
 
-export function gridHeight(width: number, srcWidth: number, srcHeight: number): number {
-  return Math.max(1, Math.round((width * srcHeight) / srcWidth));
+/** Rows needed so the design keeps the photo's proportions; `cellAspect` is cell height / width. */
+export function gridHeight(width: number, srcWidth: number, srcHeight: number, cellAspect = 1): number {
+  return Math.max(1, Math.round((width * srcHeight) / srcWidth / cellAspect));
 }
 
 /**

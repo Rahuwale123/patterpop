@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import type { CraftId } from "@/lib/crafts";
 import { Uploader } from "./Uploader";
 
 // The tool is client-only. Its loading state is the same hoop, so the static HTML
@@ -10,6 +11,6 @@ const PatternTool = dynamic(() => import("./PatternTool"), {
   loading: () => <Uploader disabled />,
 });
 
-export function ToolLoader() {
-  return <PatternTool />;
+export function ToolLoader({ craft }: { craft?: CraftId }) {
+  return <PatternTool craft={craft} />;
 }
